@@ -3,9 +3,10 @@
 use App\Http\Controllers\Api\ArticleController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
-    Route::post('/articles/sync', [ArticleController::class, 'sync'])
-        ->middleware('ability:article:sync');
-});
-
-Route::post('/paprika/sync', [ArticleController::class, 'sync']);
+// 所有路由都不需要認證
+Route::get('/articles', [ArticleController::class, 'index']);
+Route::get('/articles/{article}', [ArticleController::class, 'show']);
+Route::post('/articles', [ArticleController::class, 'store']);
+Route::put('/articles/{article}', [ArticleController::class, 'update']);
+Route::delete('/articles/{article}', [ArticleController::class, 'destroy']);
+Route::post('/articles/sync', [ArticleController::class, 'sync']);

@@ -11,7 +11,6 @@
         "laravel/sanctum": "^4.0"
     },
     "require-dev": {
-        "laravel/pint": "^1.13",
         "phpunit/phpunit": "^11.5.3"
     },
     "autoload": {
@@ -39,9 +38,6 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
-        ],
-        "test": [
-            "@php artisan test"
         ]
     },
     "extra": {

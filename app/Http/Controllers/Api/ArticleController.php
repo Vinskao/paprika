@@ -11,6 +11,128 @@ use Illuminate\Support\Facades\Validator;
 
 class ArticleController extends Controller
 {
+    public function index()
+    {
+        try {
+            $articles = Article::orderBy('file_date', 'desc')->paginate(10);
+
+            return response()->json([
+                'success' => true,
+                'data' => $articles
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch articles: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch articles',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function show(Article $article)
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $article
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch article: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch article',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function store(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'file_path' => 'required|string|max:500|unique:articles',
+                'content' => 'required|string',
+                'file_date' => 'required|date',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $article = Article::create($request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Article created successfully',
+                'data' => $article
+            ], 201);
+        } catch (\Exception $e) {
+            Log::error('Failed to create article: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create article',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function update(Request $request, Article $article)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'content' => 'required|string',
+                'file_date' => 'required|date',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $article->update($request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Article updated successfully',
+                'data' => $article
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to update article: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update article',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function destroy(Article $article)
+    {
+        try {
+            $article->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Article deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to delete article: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete article',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function sync(Request $request)
     {
         try {
