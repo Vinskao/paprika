@@ -1,123 +1,159 @@
-# Article Manager API
+# Paprika Article Sync API
 
-一個基於 Laravel 的 API 服務，用於管理來自 Astro 前端專案的 Markdown 文章。
+This API service handles synchronization of markdown articles between frontend and backend systems.
 
-## 系統需求
+## Setup Instructions
 
-- PHP 8.2+
-- PostgreSQL 12+
-- Composer
-- Node.js & NPM（用於前端開發）
-
-## 安裝步驟
-
-1. 克隆專案：
-```bash
-git clone <repository-url>
-cd article-manager
-```
-
-2. 安裝依賴：
-```bash
-composer install
-```
-
-3. 配置環境：
-```bash
-cp .env.example .env
-php artisan key:generate
-```
-
-4. 更新 `.env` 中的資料庫配置：
+1. Configure the database connection in `.env`:
 ```
 DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=article_manager
-DB_USERNAME=your_username
-DB_PASSWORD=your_password
+DB_HOST=your-database-host
+DB_PORT=your-database-port
+DB_DATABASE=your-database-name
+DB_USERNAME=your-username
+DB_PASSWORD=your-password
 ```
 
-5. 執行資料庫遷移：
+2. Run database migrations:
 ```bash
 php artisan migrate
 ```
 
-6. 生成前端 API 令牌：
-```bash
-php artisan api:generate-token astro-frontend
-```
-
-## API 文檔
-
-### 認證
-
-所有 API 請求都需要使用 Laravel Sanctum 令牌進行認證。在請求中加入以下標頭：
-
-```
-Authorization: Bearer your-token-here
-```
-
-### API 端點
-
-#### 同步文章
-```
-POST /api/articles/sync
-```
-
-請求內容：
-```json
-{
-  "articles": [
-    {
-      "slug": "article-slug",
-      "title": "文章標題",
-      "content": "文章內容...",
-      "frontmatter": {
-        "author": "作者名稱",
-        "date": "2024-03-21"
-      },
-      "file_hash": "32位元雜湊值",
-      "file_path": "src/content/work/article-slug.md"
-    }
-  ]
-}
-```
-
-回應：
-```json
-{
-  "message": "文章同步成功",
-  "data": {
-    "synced_count": 1,
-    "synced_at": "2024-03-21T12:00:00Z"
-  }
-}
-```
-
-## 開發指南
-
-1. 啟動開發伺服器：
+3. Start the Laravel development server:
 ```bash
 php artisan serve
 ```
 
-2. API 將在 `http://localhost:8000` 上運行
+The API will be available at `http://localhost:8000/api/paprika/sync`
 
-## 速率限制
+## Testing the API
 
-API 端點限制為每分鐘每 IP 60 個請求。
+You can test the API using curl:
 
-## 錯誤處理
+```bash
+curl -X POST http://localhost:8000/api/paprika/sync \
+  -H "Content-Type: application/json" \
+  -d '{
+    "articles": [
+      {
+        "file_path": "src/content/work/article-1.md",
+        "content": "# Article Title\n\nArticle content here...",
+        "file_date": "2024-12-01T10:30:00Z"
+      }
+    ]
+  }'
+```
 
-API 會返回適當的 HTTP 狀態碼和 JSON 格式的錯誤訊息：
+## Database Setup
 
-- 422: 驗證錯誤
-- 401: 認證錯誤
-- 403: 授權錯誤
-- 429: 超過速率限制
-- 500: 伺服器錯誤
+1. Create the articles table and indexes:
 
-## 授權
+```sql
+-- Create articles table
+CREATE TABLE articles (
+    id SERIAL PRIMARY KEY,
+    file_path VARCHAR(500) NOT NULL,
+    content TEXT NOT NULL,
+    file_date TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-MIT
+-- Create indexes
+CREATE UNIQUE INDEX idx_articles_file_path ON articles(file_path);
+CREATE INDEX idx_articles_file_date ON articles(file_date);
+```
+
+2. Create the trigger function:
+
+```sql
+-- Create trigger function
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+3. Create the trigger:
+
+```sql
+-- Create trigger
+CREATE TRIGGER update_articles_updated_at 
+    BEFORE UPDATE ON articles 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+```
+
+## API Endpoints
+
+### POST /api/paprika/sync
+
+Synchronizes articles between systems.
+
+#### Request Format
+
+```json
+{
+    "articles": [
+        {
+            "file_path": "src/content/work/article-1.md",
+            "content": "# Article Title\n\nArticle content here...",
+            "file_date": "2024-12-01T10:30:00Z"
+        }
+    ]
+}
+```
+
+#### Response Format
+
+Success (200):
+```json
+{
+    "success": true,
+    "message": "Articles synced successfully",
+    "data": {
+        "total_received": 5,
+        "created": 2,
+        "updated": 3,
+        "skipped": 0
+    },
+    "timestamp": "2024-12-01T12:00:00Z"
+}
+```
+
+Error (422):
+```json
+{
+    "success": false,
+    "message": "Validation failed",
+    "errors": {
+        "articles.0.file_path": ["The file path field is required"],
+        "articles.1.content": ["The content field is required"]
+    }
+}
+```
+
+## Business Logic
+
+- Accepts batch of articles in single request
+- For each article, compares file_date with existing record
+- Only updates if incoming file_date is newer than stored file_date
+- Creates new record if file_path doesn't exist
+- Skips update if incoming file_date is older or equal
+- Returns detailed sync statistics
+
+## Validation Rules
+
+- articles: required|array
+- articles.*.file_path: required|string|max:500
+- articles.*.content: required|string
+- articles.*.file_date: required|date
+
+## Error Handling
+
+- Implements try-catch for database operations
+- Returns appropriate HTTP status codes
+- Logs sync operations for debugging

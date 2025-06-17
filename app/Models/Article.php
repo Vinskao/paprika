@@ -11,17 +11,12 @@ class Article extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'slug',
-        'title',
-        'content',
-        'frontmatter',
-        'file_hash',
         'file_path',
-        'synced_at',
+        'content',
+        'file_date',
     ];
 
     protected $casts = [
-        'frontmatter' => 'array',
-        'synced_at' => 'datetime',
+        'file_date' => 'datetime',
     ];
 }
