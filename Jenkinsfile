@@ -185,7 +185,7 @@ pipeline {
 
                                     // 設置環境變數並替換模板
                                     sh '''
-                                        # Export Jenkins Credentials 為符合 Kubernetes Secret 名稱的環境變數 (帶 LARAVEL_ 前綴)
+                                        # Export Jenkins Credentials 為符合 Kubernetes Secret 名稱的環境變數
                                         export LARAVEL_DB_HOST="${DB_HOST}"
                                         export LARAVEL_DB_PORT="${DB_PORT}"
                                         export LARAVEL_DB_DATABASE="${DB_DATABASE}"
@@ -193,57 +193,26 @@ pipeline {
                                         export LARAVEL_DB_PASSWORD="${DB_PASSWORD}"
                                         export LARAVEL_APP_URL="${APP_URL}"
 
-                                        # 使用 envsubst 替換 k8s/deployment.yaml.template 產生 k8s/deployment.yaml
-                                        envsubst < k8s/deployment.yaml.template > k8s/deployment.yaml
-                                    '''
+                                        # 檢查環境變數是否正確設置
+                                        echo "=== Checking Environment Variables ==="
+                                        env | grep LARAVEL_
 
-                                    // 除錯：檢查 deployment.yaml 中的變數替換
-                                    sh '''
-                                        echo "=== Checking deployment.yaml ==="
-                                        cat k8s/deployment.yaml
-                                    '''
+                                        # Secret 部分用 envsubst 展開再 apply
+                                        echo "=== Applying Kubernetes Secret ==="
+                                        envsubst < k8s/secret.yaml.template | kubectl apply -f -
 
-                                    // 測試集群連接
-                                    sh 'kubectl cluster-info'
-
-                                    // 檢查 deployment.yaml 文件
-                                    sh 'ls -la k8s/'
-
-                                    // 檢查 Deployment 是否存在
-                                    sh '''
-                                        if kubectl get deployment paprika -n default; then
-                                            echo "Deployment exists, updating..."
-                                            kubectl set image deployment/paprika paprika=${DOCKER_IMAGE}:${DOCKER_TAG} -n default
-                                            kubectl rollout restart deployment paprika
-                                        else
-                                            echo "Deployment does not exist, creating..."
-                                            kubectl apply -f k8s/deployment.yaml
-                                        fi
-                                    '''
-
-                                    // 檢查部署狀態
-                                    sh 'kubectl get deployments -n default'
-                                    sh 'kubectl rollout status deployment/paprika'
-
-                                    // 除錯：檢查 Pod 的環境變數
-                                    sh '''
-                                        echo "=== Checking Pod Environment Variables ==="
+                                        # Deployment 部分也用 envsubst 展開再 apply
+                                        echo "=== Applying Kubernetes Deployment ==="
+                                        envsubst < k8s/deployment.yaml.template | kubectl apply -f -
 
                                         # 等待 Pod 就緒
-                                        echo "Waiting for pod to become Ready..."
+                                        echo "=== Waiting for Pod to be Ready ==="
                                         kubectl wait --for=condition=Ready pod -l app=paprika --timeout=60s
 
-                                        # 獲取 Pod 名稱
+                                        # 檢查環境變數是否正確設置
+                                        echo "=== Checking Pod Environment Variables ==="
                                         POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
-                                        echo "Found pod: $POD_NAME"
-
-                                        # 獲取容器名稱
-                                        CONTAINER_NAME=$(kubectl get pod $POD_NAME -o jsonpath="{.spec.containers[0].name}")
-                                        echo "Using container: $CONTAINER_NAME"
-
-                                        # 檢查環境變數
-                                        echo "Checking environment variables..."
-                                        kubectl exec $POD_NAME -c $CONTAINER_NAME -- env | grep -E "APP_|DB_"
+                                        kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_DATABASE_PORT_NUMBER
                                     '''
                                 }
                             } catch (Exception e) {

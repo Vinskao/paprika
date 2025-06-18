@@ -1,18 +1,4 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: paprika-secrets
-type: Opaque
-stringData:
-  LARAVEL_DATABASE_HOST: "${LARAVEL_DB_HOST}"
-  LARAVEL_DATABASE_PORT_NUMBER: "${LARAVEL_DB_PORT}"
-  LARAVEL_DATABASE_NAME: "${LARAVEL_DB_DATABASE}"
-  LARAVEL_DATABASE_USER: "${LARAVEL_DB_USERNAME}"
-  LARAVEL_DATABASE_PASSWORD: "${LARAVEL_DB_PASSWORD}"
-  LARAVEL_HOST: "${LARAVEL_APP_URL}"
----
-
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: paprika-config
@@ -49,9 +35,37 @@ spec:
         image: papakao/paprika:latest
         ports:
         - containerPort: 8080
-        envFrom:
-        - secretRef:
-            name: paprika-secrets
+        env:
+        - name: LARAVEL_DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_HOST
+        - name: LARAVEL_DATABASE_PORT_NUMBER
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_PORT_NUMBER
+        - name: LARAVEL_DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_NAME
+        - name: LARAVEL_DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_USER
+        - name: LARAVEL_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_PASSWORD
+        - name: LARAVEL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_HOST
         volumeMounts:
         - name: storage
           mountPath: /app/storage
