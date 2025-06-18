@@ -18,12 +18,17 @@ COPY . .
 # 安裝依賴
 RUN composer install --no-dev --optimize-autoloader
 
-# 設置權限
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
-    && mkdir -p /var/www/html/storage/logs \
+# 創建必要的目錄並設置權限
+RUN mkdir -p /var/www/html/storage/logs \
+    /var/www/html/storage/framework/sessions \
+    /var/www/html/storage/framework/views \
+    /var/www/html/storage/framework/cache \
+    && chown -R www-data:www-data /var/www/html/storage \
+    /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage \
+    /var/www/html/bootstrap/cache \
     && touch /var/www/html/storage/logs/laravel.log \
-    && chown -R www-data:www-data /var/www/html/storage/logs
+    && chown www-data:www-data /var/www/html/storage/logs/laravel.log
 
 # 修改 PHP-FPM 配置
 RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/g' /usr/local/etc/php-fpm.d/www.conf
