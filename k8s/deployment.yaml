@@ -4,12 +4,12 @@ metadata:
   name: paprika-secrets
 type: Opaque
 stringData:
-  DB_CONNECTION: "pgsql"
-  DB_HOST: "$(DB_HOST)"
-  DB_PORT: "$(DB_PORT)"
-  DB_DATABASE: "$(DB_DATABASE)"
-  DB_USERNAME: "$(DB_USERNAME)"
-  DB_PASSWORD: "$(DB_PASSWORD)"
+  DB_HOST: "${{ secrets.DB_HOST }}"
+  DB_PORT: "${{ secrets.DB_PORT }}"
+  DB_DATABASE: "${{ secrets.DB_DATABASE }}"
+  DB_USERNAME: "${{ secrets.DB_USERNAME }}"
+  DB_PASSWORD: "${{ secrets.DB_PASSWORD }}"
+  APP_URL: "${{ secrets.APP_URL }}"
 ---
 
 apiVersion: v1
@@ -17,10 +17,10 @@ kind: ConfigMap
 metadata:
   name: paprika-config
 data:
+  DB_CONNECTION: "pgsql"
   APP_NAME: "Paprika"
   APP_ENV: "production"
   APP_DEBUG: "true"
-  APP_URL: "$(APP_URL)"
   LOG_CHANNEL: "stack"
   LOG_LEVEL: "debug"
   CACHE_DRIVER: "file"
@@ -51,8 +51,6 @@ spec:
         ports:
         - containerPort: 9000
         envFrom:
-        - configMapRef:
-            name: paprika-config
         - secretRef:
             name: paprika-secrets
         volumeMounts:

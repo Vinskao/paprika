@@ -31,7 +31,8 @@ RUN mkdir -p /var/www/html/storage/logs \
     && chown www-data:www-data /var/www/html/storage/logs/laravel.log
 
 # 修改 PHP-FPM 配置
-RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/g' /usr/local/etc/php-fpm.d/www.conf
+RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/g' /usr/local/etc/php-fpm.d/www.conf \
+    && echo "clear_env = yes" >> /usr/local/etc/php-fpm.d/www.conf
 
 # 暴露端口
 EXPOSE 9000
