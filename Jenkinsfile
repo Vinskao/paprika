@@ -185,12 +185,15 @@ pipeline {
 
                                     // 設置環境變數並替換模板
                                     sh '''
-                                        export LARAVEL_DB_HOST=$DB_HOST
-                                        export LARAVEL_DB_PORT=$DB_PORT
-                                        export LARAVEL_DB_DATABASE=$DB_DATABASE
-                                        export LARAVEL_DB_USERNAME=$DB_USERNAME
-                                        export LARAVEL_DB_PASSWORD=$DB_PASSWORD
-                                        export LARAVEL_APP_URL=$APP_URL
+                                        # Export Jenkins Credentials 為符合 Kubernetes Secret 名稱的環境變數 (帶 LARAVEL_ 前綴)
+                                        export LARAVEL_DB_HOST="${DB_HOST}"
+                                        export LARAVEL_DB_PORT="${DB_PORT}"
+                                        export LARAVEL_DB_DATABASE="${DB_DATABASE}"
+                                        export LARAVEL_DB_USERNAME="${DB_USERNAME}"
+                                        export LARAVEL_DB_PASSWORD="${DB_PASSWORD}"
+                                        export LARAVEL_APP_URL="${APP_URL}"
+
+                                        # 使用 envsubst 替換 k8s/deployment.yaml.template 產生 k8s/deployment.yaml
                                         envsubst < k8s/deployment.yaml.template > k8s/deployment.yaml
                                     '''
 
