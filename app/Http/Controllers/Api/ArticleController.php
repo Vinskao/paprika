@@ -13,21 +13,14 @@ class ArticleController extends Controller
 {
     public function index()
     {
-        try {
-            $articles = Article::orderBy('file_date', 'desc')->paginate(10);
+        $articles = Article::select(['id', 'file_path', 'content', 'file_date', 'created_at', 'updated_at'])
+            ->orderBy('file_date', 'desc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $articles
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to fetch articles: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch articles',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'data' => $articles
+        ]);
     }
 
     public function show(Article $article)

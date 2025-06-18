@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paprika-secrets
+type: Opaque
+stringData:
+  DB_CONNECTION: "pgsql"
+  DB_HOST: "${{ secrets.DB_HOST }}"
+  DB_PORT: "${{ secrets.DB_PORT }}"
+  DB_DATABASE: "${{ secrets.DB_DATABASE }}"
+  DB_USERNAME: "${{ secrets.DB_USERNAME }}"
+  DB_PASSWORD: "${{ secrets.DB_PASSWORD }}"
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paprika-config
+data:
+  APP_NAME: "Paprika"
+  APP_ENV: "production"
+  APP_DEBUG: "true"
+  APP_URL: "${{ secrets.APP_URL }}"
+  LOG_CHANNEL: "stack"
+  LOG_LEVEL: "debug"
+  CACHE_DRIVER: "file"
+  FILESYSTEM_DISK: "local"
+  SESSION_DRIVER: "file"
+  SESSION_LIFETIME: "120"
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paprika
+  labels:
+    app: paprika
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paprika
+  template:
+    metadata:
+      labels:
+        app: paprika
+    spec:
+      containers:
+      - name: paprika
+        image: papakao/paprika:latest
+        ports:
+        - containerPort: 9000
+        envFrom:
+        - configMapRef:
+            name: paprika-config
+        - secretRef:
+            name: paprika-secrets
+        volumeMounts:
+        - name: storage
+          mountPath: /var/www/html/storage
+        - name: cache
+          mountPath: /var/www/html/bootstrap/cache
+      volumes:
+      - name: storage
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: paprika
+  labels:
+    app: paprika
+spec:
+  selector:
+    app: paprika
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 9000
+  type: ClusterIP
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paprika-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: peoplesystem.tatdvsonorth.com
+    http:
+      paths:
+      - path: /paprika
+        pathType: Prefix
+        backend:
+          service:
+            name: paprika
+            port:
+              number: 80
