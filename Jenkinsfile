@@ -215,7 +215,9 @@ pipeline {
                                     sh '''
                                         echo "=== Checking Pod Environment Variables ==="
                                         POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
-                                        kubectl exec $POD_NAME -c laravel -- env | grep -E "APP_|DB_"
+                                        CONTAINER_NAME=$(kubectl get pod $POD_NAME -o jsonpath="{.spec.containers[0].name}")
+                                        echo "Using container: $CONTAINER_NAME"
+                                        kubectl exec $POD_NAME -c $CONTAINER_NAME -- env | grep -E "APP_|DB_"
                                     '''
                                 }
                             } catch (Exception e) {
