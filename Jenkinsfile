@@ -196,23 +196,167 @@ pipeline {
                                         # 檢查環境變數是否正確設置
                                         echo "=== Checking Environment Variables ==="
                                         env | grep LARAVEL_
+                                    '''
 
-                                        # Secret 部分用 envsubst 展開再 apply
+                                    // 使用 Pipeline 變數替換生成 Secret
+                                    def secretYaml = """
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paprika-secrets
+type: Opaque
+stringData:
+  LARAVEL_DATABASE_HOST: "${DB_HOST}"
+  LARAVEL_DATABASE_PORT_NUMBER: "${DB_PORT}"
+  LARAVEL_DATABASE_NAME: "${DB_DATABASE}"
+  LARAVEL_DATABASE_USER: "${DB_USERNAME}"
+  LARAVEL_DATABASE_PASSWORD: "${DB_PASSWORD}"
+  LARAVEL_HOST: "${APP_URL}"
+  LARAVEL_DATABASE_CONNECTION: "pgsql"
+"""
+                                    writeFile file: 'k8s/secret.yaml', text: secretYaml
+
+                                    // 使用 Pipeline 變數替換生成 Deployment
+                                    def deploymentYaml = """
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: paprika-config
+data:
+  LARAVEL_APP_NAME: "Paprika"
+  LARAVEL_APP_ENV: "production"
+  LARAVEL_APP_DEBUG: "true"
+  LARAVEL_LOG_CHANNEL: "stack"
+  LARAVEL_LOG_LEVEL: "debug"
+  LARAVEL_CACHE_DRIVER: "file"
+  LARAVEL_FILESYSTEM_DISK: "local"
+  LARAVEL_SESSION_DRIVER: "file"
+  LARAVEL_SESSION_LIFETIME: "120"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paprika
+  labels:
+    app: paprika
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paprika
+  template:
+    metadata:
+      labels:
+        app: paprika
+    spec:
+      containers:
+      - name: paprika
+        image: papakao/paprika:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: LARAVEL_DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_HOST
+        - name: LARAVEL_DATABASE_PORT_NUMBER
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_PORT_NUMBER
+        - name: LARAVEL_DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_NAME
+        - name: LARAVEL_DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_USER
+        - name: LARAVEL_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_DATABASE_PASSWORD
+        - name: LARAVEL_HOST
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: LARAVEL_HOST
+        volumeMounts:
+        - name: storage
+          mountPath: /app/storage
+        - name: cache
+          mountPath: /app/bootstrap/cache
+      volumes:
+      - name: storage
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paprika
+  labels:
+    app: paprika
+spec:
+  selector:
+    app: paprika
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paprika-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: peoplesystem.tatdvsonorth.com
+    http:
+      paths:
+      - path: /paprika
+        pathType: Prefix
+        backend:
+          service:
+            name: paprika
+            port:
+              number: 80
+"""
+                                    writeFile file: 'k8s/deployment.yaml', text: deploymentYaml
+
+                                    // 應用 Kubernetes 配置
+                                    sh '''
+                                        # 應用 Secret
                                         echo "=== Applying Kubernetes Secret ==="
-                                        envsubst < k8s/secret.yaml.template | kubectl apply -f -
+                                        kubectl apply -f k8s/secret.yaml
 
-                                        # Deployment 部分也用 envsubst 展開再 apply
+                                        # 應用 Deployment
                                         echo "=== Applying Kubernetes Deployment ==="
-                                        envsubst < k8s/deployment.yaml.template | kubectl apply -f -
+                                        kubectl apply -f k8s/deployment.yaml
 
                                         # 等待 Pod 就緒
                                         echo "=== Waiting for Pod to be Ready ==="
                                         kubectl wait --for=condition=Ready pod -l app=paprika --timeout=60s
 
+                                        # 檢查 Pod 狀態
+                                        echo "=== Checking Pod Status ==="
+                                        kubectl get pods -l app=paprika
+
+                                        # 檢查 Pod 日誌
+                                        echo "=== Checking Pod Logs ==="
+                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
+                                        kubectl logs $POD_NAME
+
                                         # 檢查環境變數是否正確設置
                                         echo "=== Checking Pod Environment Variables ==="
-                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
-                                        kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_DATABASE_PORT_NUMBER
+                                        kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_
                                     '''
                                 }
                             } catch (Exception e) {
