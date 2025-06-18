@@ -172,6 +172,23 @@ pipeline {
                                     string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD'),
                                     string(credentialsId: 'APP_URL', variable: 'APP_URL')
                                 ]) {
+                                    // 除錯：檢查環境變數
+                                    sh '''
+                                        echo "=== Checking Environment Variables ==="
+                                        echo "DB_HOST: ${DB_HOST}"
+                                        echo "DB_PORT: ${DB_PORT}"
+                                        echo "DB_DATABASE: ${DB_DATABASE}"
+                                        echo "DB_USERNAME: ${DB_USERNAME}"
+                                        echo "DB_PASSWORD: [MASKED]"
+                                        echo "APP_URL: ${APP_URL}"
+                                    '''
+
+                                    // 除錯：檢查 deployment.yaml 中的變數替換
+                                    sh '''
+                                        echo "=== Checking deployment.yaml ==="
+                                        cat k8s/deployment.yaml
+                                    '''
+
                                     // 測試集群連接
                                     sh 'kubectl cluster-info'
 
@@ -193,6 +210,13 @@ pipeline {
                                     // 檢查部署狀態
                                     sh 'kubectl get deployments -n default'
                                     sh 'kubectl rollout status deployment/paprika'
+
+                                    // 除錯：檢查 Pod 的環境變數
+                                    sh '''
+                                        echo "=== Checking Pod Environment Variables ==="
+                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
+                                        kubectl exec $POD_NAME -- env | grep -E "APP_|DB_"
+                                    '''
                                 }
                             } catch (Exception e) {
                                 echo "Error during deployment: ${e.message}"
