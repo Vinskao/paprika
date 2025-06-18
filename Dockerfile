@@ -13,8 +13,11 @@ RUN composer install --no-dev --optimize-autoloader
 # 設置權限
 RUN chmod -R 777 storage bootstrap/cache
 
+# 設置環境變數
+ENV LARAVEL_PORT=8000
+
 # 暴露端口
-EXPOSE 8080
+EXPOSE 8000
 
 # 使用 Bitnami 的啟動腳本
 CMD ["/opt/bitnami/scripts/laravel/run.sh"]

@@ -232,6 +232,7 @@ data:
   LARAVEL_FILESYSTEM_DISK: "local"
   LARAVEL_SESSION_DRIVER: "file"
   LARAVEL_SESSION_LIFETIME: "120"
+  LARAVEL_PORT: "8000"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -253,7 +254,7 @@ spec:
       - name: paprika
         image: papakao/paprika:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8000
         env:
         - name: LARAVEL_DATABASE_HOST
           valueFrom:
@@ -285,6 +286,8 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: LARAVEL_HOST
+        - name: LARAVEL_PORT
+          value: "8000"
         volumeMounts:
         - name: storage
           mountPath: /app/storage
@@ -308,7 +311,7 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 8080
+    targetPort: 8000
   type: ClusterIP
 ---
 apiVersion: networking.k8s.io/v1
