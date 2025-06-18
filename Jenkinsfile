@@ -225,9 +225,21 @@ pipeline {
                                     // 除錯：檢查 Pod 的環境變數
                                     sh '''
                                         echo "=== Checking Pod Environment Variables ==="
+
+                                        # 等待 Pod 就緒
+                                        echo "Waiting for pod to become Ready..."
+                                        kubectl wait --for=condition=Ready pod -l app=paprika --timeout=60s
+
+                                        # 獲取 Pod 名稱
                                         POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
+                                        echo "Found pod: $POD_NAME"
+
+                                        # 獲取容器名稱
                                         CONTAINER_NAME=$(kubectl get pod $POD_NAME -o jsonpath="{.spec.containers[0].name}")
                                         echo "Using container: $CONTAINER_NAME"
+
+                                        # 檢查環境變數
+                                        echo "Checking environment variables..."
                                         kubectl exec $POD_NAME -c $CONTAINER_NAME -- env | grep -E "APP_|DB_"
                                     '''
                                 }
