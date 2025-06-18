@@ -65,6 +65,13 @@ pipeline {
                 script {
                     container('php') {
                         sh '''
+                            # 安裝必要的系統依賴
+                            apt-get update && apt-get install -y \
+                                git \
+                                unzip \
+                                libzip-dev \
+                                && docker-php-ext-install zip
+
                             # 確認 Dockerfile 存在
                             ls -la
                             if [ ! -f "Dockerfile" ]; then
