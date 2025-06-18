@@ -183,6 +183,17 @@ pipeline {
                                         echo "APP_URL: ${APP_URL}"
                                     '''
 
+                                    // 設置環境變數並替換模板
+                                    sh '''
+                                        export LARAVEL_DB_HOST=$DB_HOST
+                                        export LARAVEL_DB_PORT=$DB_PORT
+                                        export LARAVEL_DB_DATABASE=$DB_DATABASE
+                                        export LARAVEL_DB_USERNAME=$DB_USERNAME
+                                        export LARAVEL_DB_PASSWORD=$DB_PASSWORD
+                                        export LARAVEL_APP_URL=$APP_URL
+                                        envsubst < k8s/deployment.yaml.template > k8s/deployment.yaml
+                                    '''
+
                                     // 除錯：檢查 deployment.yaml 中的變數替換
                                     sh '''
                                         echo "=== Checking deployment.yaml ==="
