@@ -19,7 +19,14 @@ COPY . .
 RUN composer install --no-dev --optimize-autoloader
 
 # 設置權限
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
+    && mkdir -p /var/www/html/storage/logs \
+    && touch /var/www/html/storage/logs/laravel.log \
+    && chown -R www-data:www-data /var/www/html/storage/logs
+
+# 修改 PHP-FPM 配置
+RUN sed -i 's/listen = 127.0.0.1:9000/listen = 9000/g' /usr/local/etc/php-fpm.d/www.conf
 
 # 暴露端口
 EXPOSE 9000

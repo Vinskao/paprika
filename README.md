@@ -11,7 +11,7 @@ http://127.0.0.1:8000/api/articles
 
 ### Production
 ```
-http://peoplesystem.tatdvsonorth.com/paprika/api/articles
+https://peoplesystem.tatdvsonorth.com/paprika/api/articles
 ```
 
 ## Setup Instructions

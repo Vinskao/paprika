@@ -5,11 +5,11 @@ metadata:
 type: Opaque
 stringData:
   DB_CONNECTION: "pgsql"
-  DB_HOST: "${{ secrets.DB_HOST }}"
-  DB_PORT: "${{ secrets.DB_PORT }}"
-  DB_DATABASE: "${{ secrets.DB_DATABASE }}"
-  DB_USERNAME: "${{ secrets.DB_USERNAME }}"
-  DB_PASSWORD: "${{ secrets.DB_PASSWORD }}"
+  DB_HOST: "${DB_HOST}"
+  DB_PORT: "${DB_PORT}"
+  DB_DATABASE: "${DB_DATABASE}"
+  DB_USERNAME: "${DB_USERNAME}"
+  DB_PASSWORD: "${DB_PASSWORD}"
 ---
 
 apiVersion: v1
@@ -20,7 +20,7 @@ data:
   APP_NAME: "Paprika"
   APP_ENV: "production"
   APP_DEBUG: "true"
-  APP_URL: "${{ secrets.APP_URL }}"
+  APP_URL: "${APP_URL}"
   LOG_CHANNEL: "stack"
   LOG_LEVEL: "debug"
   CACHE_DRIVER: "file"
