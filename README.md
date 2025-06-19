@@ -135,6 +135,7 @@ POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name
 
 # Create necessary directories and set permissions
 kubectl exec -it $POD_NAME -- mkdir -p /app/storage/framework/views
+kubectl exec -it $POD_NAME -- mkdir -p /app/storage/framework/cache/data
 kubectl exec -it $POD_NAME -- chmod -R 777 /app/storage
 kubectl exec -it $POD_NAME -- chmod -R 777 /app/bootstrap/cache
 
@@ -150,11 +151,27 @@ chmod +x fix-permissions.sh
 ./fix-permissions.sh
 ```
 
+Or verify cache configuration:
+```bash
+chmod +x verify-cache-config.sh
+./verify-cache-config.sh
+```
+
+### Cache Configuration Issues
+
+The application uses file-based caching by default. Ensure these directories exist with proper permissions:
+
+- `/app/storage/framework/cache/data` - Laravel file cache storage
+- `/app/storage/framework/views` - Blade template cache
+- `/app/storage/framework/sessions` - Session files
+- `/app/bootstrap/cache` - Application cache
+
 ### Common Issues
 
 1. **Storage directories not found**: The application requires specific Laravel storage directories to exist with proper permissions.
 2. **Permission denied errors**: Ensure storage and bootstrap/cache directories have 777 permissions.
 3. **Cache issues**: Clear Laravel caches after permission changes.
+4. **Blade compiler cache path errors**: Ensure `/app/storage/framework/cache/data` directory exists and is writable.
 
 ## API Endpoints
 

@@ -5,7 +5,7 @@ FROM bitnami/laravel:latest
 WORKDIR /app
 
 # 創建必要的 Laravel 目錄結構
-RUN mkdir -p storage/framework/{cache,views,sessions} \
+RUN mkdir -p storage/framework/{cache/data,views,sessions} \
     && mkdir -p storage/app/{public,private} \
     && mkdir -p storage/logs \
     && mkdir -p bootstrap/cache

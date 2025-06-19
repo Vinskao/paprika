@@ -24,7 +24,7 @@ echo "=== Fixing Storage Permissions ==="
 kubectl exec $POD_NAME -c paprika -- /bin/sh -c '
     echo "Creating necessary directories..."
     mkdir -p /app/storage/framework/views
-    mkdir -p /app/storage/framework/cache
+    mkdir -p /app/storage/framework/cache/data
     mkdir -p /app/storage/framework/sessions
     mkdir -p /app/storage/app/public
     mkdir -p /app/storage/app/private

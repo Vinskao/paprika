@@ -86,11 +86,14 @@ kubectl exec $POD_NAME -c paprika -- sh -c '
     echo "Checking storage/framework directory permissions..."
     ls -la /app/storage/framework/
     echo ""
+    echo "Checking storage/framework/cache directory permissions..."
+    ls -la /app/storage/framework/cache/
+    echo ""
     echo "Checking bootstrap/cache directory permissions..."
     ls -la /app/bootstrap/cache/
     echo ""
     echo "Checking if storage directories are writable..."
-    if [ -w /app/storage ] && [ -w /app/bootstrap/cache ]; then
+    if [ -w /app/storage ] && [ -w /app/bootstrap/cache ] && [ -w /app/storage/framework/cache/data ]; then
         echo "✅ Storage directories are writable"
     else
         echo "❌ Storage directories are not writable"

@@ -80,7 +80,7 @@ pipeline {
                             fi
 
                             # 創建必要的 Laravel 目錄結構
-                            mkdir -p storage/framework/{cache,views,sessions}
+                            mkdir -p storage/framework/{cache/data,views,sessions}
                             mkdir -p storage/app/{public,private}
                             mkdir -p storage/logs
                             mkdir -p bootstrap/cache
@@ -448,7 +448,7 @@ spec:
                                         kubectl exec $POD_NAME -c paprika -- /bin/sh -c '
                                             # 確保目錄存在
                                             mkdir -p /app/storage/framework/views
-                                            mkdir -p /app/storage/framework/cache
+                                            mkdir -p /app/storage/framework/cache/data
                                             mkdir -p /app/storage/framework/sessions
                                             mkdir -p /app/storage/app/public
                                             mkdir -p /app/storage/app/private
