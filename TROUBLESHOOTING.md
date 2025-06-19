@@ -133,6 +133,44 @@ stringData:
   LARAVEL_APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
 ```
 
+### 錯誤 5: kubectl wait timeout 錯誤
+**症狀**: `error: timed out waiting for the condition on pods/paprika-xxx`
+**原因**: 
+- Pod 重啟次數過多（如 RESTARTS: 83）
+- 容器啟動時間超過預設的 60 秒 timeout
+- Laravel 應用需要更多時間完成初始化
+
+**解決**: 延長 timeout 時間並加入應用健康檢查
+
+```groovy
+// ❌ 錯誤：timeout 太短
+kubectl wait --for=condition=Ready pod -l app=paprika --timeout=60s
+
+// ✅ 正確：延長 timeout 並加入應用檢查
+kubectl wait --for=condition=Ready pod -l app=paprika --timeout=180s
+
+// 額外的應用健康檢查
+for i in {1..30}; do
+    if kubectl exec $POD_NAME -c paprika -- curl -f http://localhost:8000/up >/dev/null 2>&1; then
+        echo "✅ Laravel application is ready!"
+        break
+    fi
+    sleep 2
+done
+```
+
+**檢查 Pod 狀態**：
+```bash
+# 檢查 Pod 重啟次數
+kubectl get pods -l app=paprika
+
+# 檢查 Pod 詳細狀態
+kubectl describe pod <pod-name>
+
+# 檢查容器日誌
+kubectl logs <pod-name> -c paprika --tail=50
+```
+
 ## 測試腳本
 使用 `debug-env.sh` 腳本來診斷環境變數問題：
 ```bash

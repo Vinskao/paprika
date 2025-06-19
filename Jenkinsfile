@@ -395,11 +395,43 @@ spec:
 
                                         # 等待 Pod 就緒
                                         echo "=== Waiting for Pod to be Ready ==="
-                                        kubectl wait --for=condition=Ready pod -l app=paprika --timeout=60s
+                                        kubectl wait --for=condition=Ready pod -l app=paprika --timeout=180s
 
                                         # 檢查 Pod 狀態
                                         echo "=== Checking Pod Status ==="
                                         kubectl get pods -l app=paprika
+
+                                        # 檢查 Pod 詳細狀態
+                                        echo "=== Checking Pod Details ==="
+                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
+                                        kubectl describe pod $POD_NAME
+
+                                        # 執行 Pod 健康檢查腳本
+                                        echo "=== Running Pod Health Check Script ==="
+                                        chmod +x check-pod-health.sh
+                                        ./check-pod-health.sh
+
+                                        # 檢查 Pod 重啟次數
+                                        echo "=== Checking Pod Restart Count ==="
+                                        kubectl get pods -l app=paprika -o jsonpath="{.items[0].status.containerStatuses[0].restartCount}"
+
+                                        # 等待應用完全啟動
+                                        echo "=== Waiting for Laravel Application to be Ready ==="
+                                        for i in {1..30}; do
+                                            echo "Attempt $i/30: Checking Laravel application..."
+                                            if kubectl exec $POD_NAME -c paprika -- curl -f http://localhost:8000/up >/dev/null 2>&1; then
+                                                echo "✅ Laravel application is ready!"
+                                                break
+                                            fi
+                                            if [ $i -eq 30 ]; then
+                                                echo "❌ Laravel application failed to become ready after 30 attempts"
+                                                echo "=== Checking Laravel logs ==="
+                                                kubectl logs $POD_NAME -c paprika --tail=50
+                                                exit 1
+                                            fi
+                                            echo "Application not ready yet, waiting 2 seconds..."
+                                            sleep 2
+                                        done
 
                                         # 動態產生 .env 檔案
                                         echo "=== Generating .env file dynamically ==="
