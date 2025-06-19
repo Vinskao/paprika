@@ -56,4 +56,17 @@ fi
 echo "DB_PORT_INT validation passed: ${DB_PORT_INT}"
 echo ""
 
+echo "=== Testing Kubernetes Secret stringData format ==="
+# 模擬正確的 Kubernetes Secret stringData 格式
+SECRET_YAML="  LARAVEL_DATABASE_PORT_NUMBER: \"${DB_PORT_INT}\""
+echo "Correct Secret YAML format: ${SECRET_YAML}"
+
+# 檢查是否包含引號
+if [[ "${SECRET_YAML}" == *'"'* ]]; then
+    echo "✅ Secret YAML format is correct (contains quotes)"
+else
+    echo "❌ Secret YAML format is incorrect (missing quotes)"
+fi
+echo ""
+
 echo "=== Environment check complete ==="

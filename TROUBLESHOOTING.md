@@ -107,6 +107,32 @@ if (!secretYaml.contains("LARAVEL_DATABASE_PORT_NUMBER: ${dbPortClean}")) {
 **症狀**: 端口值包含字母或其他字符
 **解決**: 檢查 Jenkins Credential 設置
 
+### 錯誤 4: Kubernetes Secret stringData 類型錯誤
+**症狀**: `cannot convert int64 to string` 錯誤
+**原因**: Kubernetes Secret 的 `stringData` 欄位要求所有值都必須是字串類型
+**解決**: 在 YAML 生成時為所有值加上雙引號
+
+```groovy
+// ❌ 錯誤：數字會被當作 int64
+LARAVEL_DATABASE_PORT_NUMBER: ${dbPortClean}
+
+// ✅ 正確：明確指定為字串
+LARAVEL_DATABASE_PORT_NUMBER: "${dbPortClean}"
+```
+
+**完整的正確格式**：
+```yaml
+stringData:
+  LARAVEL_DATABASE_HOST: "${DB_HOST}"
+  LARAVEL_DATABASE_PORT_NUMBER: "${dbPortClean}"
+  LARAVEL_DATABASE_NAME: "${DB_DATABASE}"
+  LARAVEL_DATABASE_USER: "${DB_USERNAME}"
+  LARAVEL_DATABASE_PASSWORD: "${DB_PASSWORD}"
+  LARAVEL_HOST: "${APP_URL}"
+  LARAVEL_DATABASE_CONNECTION: "pgsql"
+  LARAVEL_APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
+```
+
 ## 測試腳本
 使用 `debug-env.sh` 腳本來診斷環境變數問題：
 ```bash
