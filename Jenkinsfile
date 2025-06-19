@@ -259,43 +259,6 @@ spec:
         image: papakao/paprika:latest
         ports:
         - containerPort: 8000
-        lifecycle:
-          postStart:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - |
-                  echo "生成 Laravel .env 檔案"
-                  cat <<EOF > /app/.env
-                  APP_NAME=Paprika
-                  APP_ENV=\\\$LARAVEL_APP_ENV
-                  APP_KEY=\\\$LARAVEL_APP_KEY
-                  APP_DEBUG=true
-                  APP_URL=\\\$LARAVEL_APP_URL
-
-                  LOG_CHANNEL=stack
-                  LOG_LEVEL=debug
-
-                  DB_CONNECTION=pgsql
-                  DB_HOST=\\\$LARAVEL_DATABASE_HOST
-                  DB_PORT=\\\$LARAVEL_DATABASE_PORT_NUMBER
-                  DB_DATABASE=\\\$LARAVEL_DATABASE_NAME
-                  DB_USERNAME=\\\$LARAVEL_DATABASE_USER
-                  DB_PASSWORD=\\\$LARAVEL_DATABASE_PASSWORD
-
-                  CACHE_DRIVER=file
-                  QUEUE_CONNECTION=sync
-                  SESSION_DRIVER=file
-                  SESSION_LIFETIME=120
-
-                  BROADCAST_DRIVER=log
-                  FILESYSTEM_DISK=local
-                  EOF
-
-                  echo ".env 建立完成"
-                  echo "檢查 .env 檔案內容："
-                  cat /app/.env
         envFrom:
         - configMapRef:
             name: paprika-config
@@ -396,9 +359,43 @@ spec:
                                         echo "=== Checking Pod Status ==="
                                         kubectl get pods -l app=paprika
 
+                                        # 動態產生 .env 檔案
+                                        echo "=== Generating .env file dynamically ==="
+                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
+                                        kubectl exec $POD_NAME -c paprika -- /bin/sh -c '
+                                            cat <<EOF > /app/.env
+                                            APP_NAME=Paprika
+                                            APP_ENV=${LARAVEL_APP_ENV}
+                                            APP_KEY=${LARAVEL_APP_KEY}
+                                            APP_DEBUG=true
+                                            APP_URL=${LARAVEL_APP_URL}
+
+                                            LOG_CHANNEL=stack
+                                            LOG_LEVEL=debug
+
+                                            DB_CONNECTION=pgsql
+                                            DB_HOST=${LARAVEL_DATABASE_HOST}
+                                            DB_PORT=${LARAVEL_DATABASE_PORT_NUMBER}
+                                            DB_DATABASE=${LARAVEL_DATABASE_NAME}
+                                            DB_USERNAME=${LARAVEL_DATABASE_USER}
+                                            DB_PASSWORD=${LARAVEL_DATABASE_PASSWORD}
+
+                                            CACHE_DRIVER=file
+                                            QUEUE_CONNECTION=sync
+                                            SESSION_DRIVER=file
+                                            SESSION_LIFETIME=120
+
+                                            BROADCAST_DRIVER=log
+                                            FILESYSTEM_DISK=local
+                                            EOF
+
+                                            echo ".env 建立完成"
+                                            echo "檢查 .env 檔案內容："
+                                            cat /app/.env
+                                        '
+
                                         # 檢查 Pod 日誌
                                         echo "=== Checking Pod Logs ==="
-                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
                                         kubectl logs $POD_NAME
 
                                         # 檢查環境變數是否正確設置
