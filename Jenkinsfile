@@ -213,6 +213,7 @@ stringData:
   LARAVEL_DATABASE_PASSWORD: "${DB_PASSWORD}"
   LARAVEL_HOST: "${APP_URL}"
   LARAVEL_DATABASE_CONNECTION: "pgsql"
+  LARAVEL_APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
 """
                                     writeFile file: 'k8s/secret.yaml', text: secretYaml
 
@@ -226,13 +227,16 @@ data:
   LARAVEL_APP_NAME: "Paprika"
   LARAVEL_APP_ENV: "production"
   LARAVEL_APP_DEBUG: "true"
+  LARAVEL_APP_URL: "${APP_URL}"
   LARAVEL_LOG_CHANNEL: "stack"
   LARAVEL_LOG_LEVEL: "debug"
   LARAVEL_CACHE_DRIVER: "file"
   LARAVEL_FILESYSTEM_DISK: "local"
   LARAVEL_SESSION_DRIVER: "file"
   LARAVEL_SESSION_LIFETIME: "120"
-  LARAVEL_PORT: "8000"
+  LARAVEL_DATABASE_CONNECTION: "pgsql"
+  LARAVEL_BROADCAST_DRIVER: "log"
+  LARAVEL_QUEUE_CONNECTION: "sync"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -255,6 +259,46 @@ spec:
         image: papakao/paprika:latest
         ports:
         - containerPort: 8000
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  echo "生成 Laravel .env 檔案"
+                  cat <<EOF > /app/.env
+                  APP_NAME=Paprika
+                  APP_ENV=\$LARAVEL_APP_ENV
+                  APP_KEY=\$LARAVEL_APP_KEY
+                  APP_DEBUG=true
+                  APP_URL=\$LARAVEL_APP_URL
+
+                  LOG_CHANNEL=stack
+                  LOG_LEVEL=debug
+
+                  DB_CONNECTION=pgsql
+                  DB_HOST=\$LARAVEL_DATABASE_HOST
+                  DB_PORT=\$LARAVEL_DATABASE_PORT_NUMBER
+                  DB_DATABASE=\$LARAVEL_DATABASE_NAME
+                  DB_USERNAME=\$LARAVEL_DATABASE_USER
+                  DB_PASSWORD=\$LARAVEL_DATABASE_PASSWORD
+
+                  CACHE_DRIVER=file
+                  QUEUE_CONNECTION=sync
+                  SESSION_DRIVER=file
+                  SESSION_LIFETIME=120
+
+                  BROADCAST_DRIVER=log
+                  FILESYSTEM_DISK=local
+                  EOF
+
+                  echo ".env 建立完成"
+                  echo "檢查 .env 檔案內容："
+                  cat /app/.env
+        envFrom:
+        - configMapRef:
+            name: paprika-config
         env:
         - name: LARAVEL_DATABASE_HOST
           valueFrom:
@@ -281,13 +325,11 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: LARAVEL_DATABASE_PASSWORD
-        - name: LARAVEL_HOST
+        - name: LARAVEL_APP_KEY
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_HOST
-        - name: LARAVEL_PORT
-          value: "8000"
+              key: LARAVEL_APP_KEY
         volumeMounts:
         - name: storage
           mountPath: /app/storage
