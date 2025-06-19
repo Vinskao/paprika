@@ -145,18 +145,6 @@ kubectl exec -it $POD_NAME -- php artisan config:clear
 kubectl exec -it $POD_NAME -- php artisan view:clear
 ```
 
-Or use the provided fix script:
-```bash
-chmod +x fix-permissions.sh
-./fix-permissions.sh
-```
-
-Or verify cache configuration:
-```bash
-chmod +x verify-cache-config.sh
-./verify-cache-config.sh
-```
-
 ### Cache Configuration Issues
 
 The application uses file-based caching by default. Ensure these directories exist with proper permissions:
@@ -166,12 +154,21 @@ The application uses file-based caching by default. Ensure these directories exi
 - `/app/storage/framework/sessions` - Session files
 - `/app/bootstrap/cache` - Application cache
 
+### View Compiler Issues
+
+The Blade compiler requires a specific cache path for compiled templates. If you encounter "Please provide a valid cache path" errors:
+
+1. **Check View Compiler Path**: Ensure `VIEW_COMPILED_PATH` environment variable is set
+2. **Verify Directory Permissions**: The `/app/storage/framework/views` directory must be writable
+3. **Validation**: View compiler validation is automatically performed during Docker build and deployment
+
 ### Common Issues
 
 1. **Storage directories not found**: The application requires specific Laravel storage directories to exist with proper permissions.
 2. **Permission denied errors**: Ensure storage and bootstrap/cache directories have 777 permissions.
 3. **Cache issues**: Clear Laravel caches after permission changes.
 4. **Blade compiler cache path errors**: Ensure `/app/storage/framework/cache/data` directory exists and is writable.
+5. **View compiler cache path errors**: Ensure `/app/storage/framework/views` directory exists and is writable, and `VIEW_COMPILED_PATH` is set correctly.
 
 ## API Endpoints
 
@@ -280,158 +277,3 @@ Error (422):
 
 ### 3. 同步多篇文章
 - **端點**: `POST /api/articles/sync`
-- **說明**: 批次同步多篇文章，會根據 file_date 決定是否更新
-- **請求格式**:
-```json
-{
-    "articles": [
-        {
-            "file_path": "src/content/work/article-1.md",
-            "content": "# Article Title\n\nArticle content here...",
-            "file_date": "2024-12-01T10:30:00Z"
-        }
-    ]
-}
-```
-- **回應格式**:
-```json
-{
-    "success": true,
-    "message": "Articles synced successfully",
-    "data": {
-        "total_received": 5,
-        "created": 2,
-        "updated": 3,
-        "skipped": 0
-    },
-    "timestamp": "2024-12-01T12:00:00Z"
-}
-```
-
-### 4. 取得單篇文章
-- **端點**: `GET /api/articles/{article}`
-- **說明**: 根據 ID 取得特定文章的詳細資訊
-- **回應格式**:
-```json
-{
-    "success": true,
-    "data": {
-        "id": 1,
-        "file_path": "src/content/work/article-1.md",
-        "content": "# Article Title\n\nArticle content here...",
-        "file_date": "2024-12-01T10:30:00Z",
-        "created_at": "2024-03-21T12:00:00Z",
-        "updated_at": "2024-03-21T12:00:00Z"
-    }
-}
-```
-
-### 5. 更新單篇文章
-- **端點**: `PUT /api/articles/{article}`
-- **說明**: 更新特定文章的內容
-- **請求格式**:
-```json
-{
-    "file_path": "src/content/work/article-1.md",
-    "content": "# Updated Title\n\nUpdated content here...",
-    "file_date": "2024-12-01T10:30:00Z"
-}
-```
-
-### 6. 刪除單篇文章
-- **端點**: `DELETE /api/articles/{article}`
-- **說明**: 刪除特定文章
-- **回應格式**:
-```json
-{
-    "success": true,
-    "message": "Article deleted successfully"
-}
-```
-
-## Postman 集合
-
-你可以使用以下 Postman 集合來測試 API：
-
-```json
-{
-    "info": {
-        "name": "Paprika Article API",
-        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-    },
-    "item": [
-        {
-            "name": "Get All Articles",
-            "request": {
-                "method": "GET",
-                "url": "http://localhost:8001/api/articles"
-            }
-        },
-        {
-            "name": "Create Article",
-            "request": {
-                "method": "POST",
-                "url": "http://localhost:8001/api/articles",
-                "header": [
-                    {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                    }
-                ],
-                "body": {
-                    "mode": "raw",
-                    "raw": "{\n    \"file_path\": \"src/content/work/article-1.md\",\n    \"content\": \"# Article Title\\n\\nArticle content here...\",\n    \"file_date\": \"2024-12-01T10:30:00Z\"\n}"
-                }
-            }
-        },
-        {
-            "name": "Sync Articles",
-            "request": {
-                "method": "POST",
-                "url": "http://localhost:8001/api/articles/sync",
-                "header": [
-                    {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                    }
-                ],
-                "body": {
-                    "mode": "raw",
-                    "raw": "{\n    \"articles\": [\n        {\n            \"file_path\": \"src/content/work/article-1.md\",\n            \"content\": \"# Article Title\\n\\nArticle content here...\",\n            \"file_date\": \"2024-12-01T10:30:00Z\"\n        }\n    ]\n}"
-                }
-            }
-        },
-        {
-            "name": "Get Article",
-            "request": {
-                "method": "GET",
-                "url": "http://localhost:8001/api/articles/1"
-            }
-        },
-        {
-            "name": "Update Article",
-            "request": {
-                "method": "PUT",
-                "url": "http://localhost:8001/api/articles/1",
-                "header": [
-                    {
-                        "key": "Content-Type",
-                        "value": "application/json"
-                    }
-                ],
-                "body": {
-                    "mode": "raw",
-                    "raw": "{\n    \"file_path\": \"src/content/work/article-1.md\",\n    \"content\": \"# Updated Title\\n\\nUpdated content here...\",\n    \"file_date\": \"2024-12-01T10:30:00Z\"\n}"
-                }
-            }
-        },
-        {
-            "name": "Delete Article",
-            "request": {
-                "method": "DELETE",
-                "url": "http://localhost:8001/api/articles/1"
-            }
-        }
-    ]
-}
-```

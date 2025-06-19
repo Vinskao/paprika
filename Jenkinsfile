@@ -455,15 +455,69 @@ spec:
                                             mkdir -p /app/storage/logs
                                             mkdir -p /app/bootstrap/cache
 
-                                            # 設置權限
+                                            # 設置權限 - 使用 777 確保完全訪問
                                             chmod -R 777 /app/storage
                                             chmod -R 777 /app/bootstrap/cache
 
+                                            # 設置所有權 - Bitnami Laravel 容器使用 1001:1001
+                                            chown -R 1001:1001 /app/storage 2>/dev/null || true
+                                            chown -R 1001:1001 /app/bootstrap/cache 2>/dev/null || true
+
+                                            # 確保目錄確實存在且可寫
+                                            echo "=== Verifying directory structure ==="
+                                            ls -la /app/storage/framework/
+                                            echo ""
+                                            ls -la /app/storage/framework/cache/
+                                            echo ""
+                                            ls -la /app/bootstrap/cache/
+                                            echo ""
+
+                                            # 測試寫入權限
+                                            echo "=== Testing write permissions ==="
+                                            echo "test" > /app/storage/framework/views/test.tmp && echo "✅ Can write to views" && rm -f /app/storage/framework/views/test.tmp
+                                            echo "test" > /app/storage/framework/cache/data/test.tmp && echo "✅ Can write to cache/data" && rm -f /app/storage/framework/cache/data/test.tmp
+                                            echo "test" > /app/bootstrap/cache/test.tmp && echo "✅ Can write to bootstrap/cache" && rm -f /app/bootstrap/cache/test.tmp
+
                                             # 清除 Laravel 快取
+                                            echo "=== Clearing Laravel caches ==="
                                             php artisan cache:clear
                                             php artisan config:clear
                                             php artisan view:clear
                                             php artisan route:clear
+
+                                            # 驗證 View 編譯器配置
+                                            echo "=== Validating View Compiler Configuration ==="
+                                            php -r '
+                                                try {
+                                                    $compiledPath = config("view.compiled");
+                                                    echo "View compiled path: " . $compiledPath . PHP_EOL;
+
+                                                    if (empty($compiledPath)) {
+                                                        throw new Exception("View compiled path is empty");
+                                                    }
+
+                                                    if (!is_dir($compiledPath)) {
+                                                        throw new Exception("View compiled directory does not exist: " . $compiledPath);
+                                                    }
+
+                                                    if (!is_writable($compiledPath)) {
+                                                        throw new Exception("View compiled directory is not writable: " . $compiledPath);
+                                                    }
+
+                                                    echo "✅ View compiler cache path validated" . PHP_EOL;
+
+                                                    // Test creating a Blade compiler instance
+                                                    $bladeCompiler = new Illuminate\View\Compilers\BladeCompiler(
+                                                        app("files"),
+                                                        $compiledPath
+                                                    );
+                                                    echo "✅ Blade compiler can be instantiated" . PHP_EOL;
+
+                                                } catch (Exception $e) {
+                                                    echo "❌ View compiler validation failed: " . $e->getMessage() . PHP_EOL;
+                                                    exit(1);
+                                                }
+                                            '
 
                                             echo "✅ Permissions and cache clearing completed"
                                         '
@@ -496,6 +550,9 @@ spec:
 
                                             BROADCAST_DRIVER=log
                                             FILESYSTEM_DISK=local
+
+                                            # View compiler settings
+                                            VIEW_COMPILED_PATH=/app/storage/framework/views
                                             EOF
 
                                             echo ".env 建立完成"
