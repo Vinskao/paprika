@@ -345,6 +345,19 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: LARAVEL_APP_KEY
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  mkdir -p /app/storage/framework/{views,cache/data,sessions} && \
+                  mkdir -p /app/storage/app/{public,private} && \
+                  mkdir -p /app/storage/logs && \
+                  mkdir -p /app/bootstrap/cache && \
+                  chmod -R 777 /app/storage /app/bootstrap/cache && \
+                  echo "✅ PostStart: Laravel directories created and permissions set"
         volumeMounts:
         - name: storage
           mountPath: /app/storage
@@ -416,11 +429,6 @@ spec:
                                         POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
                                         kubectl describe pod $POD_NAME
 
-                                        # 執行 Pod 健康檢查腳本
-                                        echo "=== Running Pod Health Check Script ==="
-                                        chmod +x check-pod-health.sh
-                                        ./check-pod-health.sh
-
                                         # 檢查 Pod 重啟次數
                                         echo "=== Checking Pod Restart Count ==="
                                         kubectl get pods -l app=paprika -o jsonpath="{.items[0].status.containerStatuses[0].restartCount}"
@@ -443,123 +451,6 @@ spec:
                                             sleep 2
                                         done
 
-                                        # 設置權限和執行 Laravel 維護命令
-                                        echo "=== Setting Permissions and Running Laravel Commands ==="
-                                        kubectl exec $POD_NAME -c paprika -- /bin/sh -c '
-                                            # 確保目錄存在
-                                            mkdir -p /app/storage/framework/views
-                                            mkdir -p /app/storage/framework/cache/data
-                                            mkdir -p /app/storage/framework/sessions
-                                            mkdir -p /app/storage/app/public
-                                            mkdir -p /app/storage/app/private
-                                            mkdir -p /app/storage/logs
-                                            mkdir -p /app/bootstrap/cache
-
-                                            # 設置權限 - 使用 777 確保完全訪問
-                                            chmod -R 777 /app/storage
-                                            chmod -R 777 /app/bootstrap/cache
-
-                                            # 設置所有權 - Bitnami Laravel 容器使用 1001:1001
-                                            chown -R 1001:1001 /app/storage 2>/dev/null || true
-                                            chown -R 1001:1001 /app/bootstrap/cache 2>/dev/null || true
-
-                                            # 確保目錄確實存在且可寫
-                                            echo "=== Verifying directory structure ==="
-                                            ls -la /app/storage/framework/
-                                            echo ""
-                                            ls -la /app/storage/framework/cache/
-                                            echo ""
-                                            ls -la /app/bootstrap/cache/
-                                            echo ""
-
-                                            # 測試寫入權限
-                                            echo "=== Testing write permissions ==="
-                                            echo "test" > /app/storage/framework/views/test.tmp && echo "✅ Can write to views" && rm -f /app/storage/framework/views/test.tmp
-                                            echo "test" > /app/storage/framework/cache/data/test.tmp && echo "✅ Can write to cache/data" && rm -f /app/storage/framework/cache/data/test.tmp
-                                            echo "test" > /app/bootstrap/cache/test.tmp && echo "✅ Can write to bootstrap/cache" && rm -f /app/bootstrap/cache/test.tmp
-
-                                            # 清除 Laravel 快取
-                                            echo "=== Clearing Laravel caches ==="
-                                            php artisan cache:clear
-                                            php artisan config:clear
-                                            php artisan view:clear
-                                            php artisan route:clear
-
-                                            # 驗證 View 編譯器配置
-                                            echo "=== Validating View Compiler Configuration ==="
-                                            php -r '
-                                                try {
-                                                    $compiledPath = config("view.compiled");
-                                                    echo "View compiled path: " . $compiledPath . PHP_EOL;
-
-                                                    if (empty($compiledPath)) {
-                                                        throw new Exception("View compiled path is empty");
-                                                    }
-
-                                                    if (!is_dir($compiledPath)) {
-                                                        throw new Exception("View compiled directory does not exist: " . $compiledPath);
-                                                    }
-
-                                                    if (!is_writable($compiledPath)) {
-                                                        throw new Exception("View compiled directory is not writable: " . $compiledPath);
-                                                    }
-
-                                                    echo "✅ View compiler cache path validated" . PHP_EOL;
-
-                                                    // Test creating a Blade compiler instance
-                                                    $bladeCompiler = new Illuminate\View\Compilers\BladeCompiler(
-                                                        app("files"),
-                                                        $compiledPath
-                                                    );
-                                                    echo "✅ Blade compiler can be instantiated" . PHP_EOL;
-
-                                                } catch (Exception $e) {
-                                                    echo "❌ View compiler validation failed: " . $e->getMessage() . PHP_EOL;
-                                                    exit(1);
-                                                }
-                                            '
-
-                                            echo "✅ Permissions and cache clearing completed"
-                                        '
-
-                                        # 動態產生 .env 檔案
-                                        echo "=== Generating .env file dynamically ==="
-                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
-                                        kubectl exec $POD_NAME -c paprika -- /bin/sh -c '
-                                            cat <<EOF > /app/.env
-                                            APP_NAME=Paprika
-                                            APP_ENV=${LARAVEL_APP_ENV}
-                                            APP_KEY=${LARAVEL_APP_KEY}
-                                            APP_DEBUG=true
-                                            APP_URL=${LARAVEL_APP_URL}
-
-                                            LOG_CHANNEL=stack
-                                            LOG_LEVEL=debug
-
-                                            DB_CONNECTION=pgsql
-                                            DB_HOST=${LARAVEL_DATABASE_HOST}
-                                            DB_PORT=${LARAVEL_DATABASE_PORT_NUMBER}
-                                            DB_DATABASE=${LARAVEL_DATABASE_NAME}
-                                            DB_USERNAME=${LARAVEL_DATABASE_USER}
-                                            DB_PASSWORD=${LARAVEL_DATABASE_PASSWORD}
-
-                                            CACHE_DRIVER=file
-                                            QUEUE_CONNECTION=sync
-                                            SESSION_DRIVER=file
-                                            SESSION_LIFETIME=120
-
-                                            BROADCAST_DRIVER=log
-                                            FILESYSTEM_DISK=local
-
-                                            # View compiler settings
-                                            VIEW_COMPILED_PATH=/app/storage/framework/views
-                                            EOF
-
-                                            echo ".env 建立完成"
-                                            echo "檢查 .env 檔案內容："
-                                            cat /app/.env
-                                        '
-
                                         # 檢查 Pod 日誌
                                         echo "=== Checking Pod Logs ==="
                                         kubectl logs $POD_NAME
@@ -567,22 +458,6 @@ spec:
                                         # 檢查環境變數是否正確設置
                                         echo "=== Checking Pod Environment Variables ==="
                                         kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_
-
-                                        # 詳細檢查 LARAVEL_DATABASE_PORT_NUMBER
-                                        echo "=== Detailed DB_PORT Check ==="
-                                        kubectl exec $POD_NAME -c paprika -- sh -c '
-                                            echo "LARAVEL_DATABASE_PORT_NUMBER value: ${LARAVEL_DATABASE_PORT_NUMBER}"
-                                            echo "LARAVEL_DATABASE_PORT_NUMBER length: ${#LARAVEL_DATABASE_PORT_NUMBER}"
-                                            echo "LARAVEL_DATABASE_PORT_NUMBER hex dump:"
-                                            echo "${LARAVEL_DATABASE_PORT_NUMBER}" | hexdump -C
-
-                                            # 驗證是否為整數
-                                            if [[ ! "${LARAVEL_DATABASE_PORT_NUMBER}" =~ ^[0-9]+$ ]]; then
-                                                echo "ERROR: LARAVEL_DATABASE_PORT_NUMBER is not a valid integer!"
-                                                exit 1
-                                            fi
-                                            echo "LARAVEL_DATABASE_PORT_NUMBER validation passed: ${LARAVEL_DATABASE_PORT_NUMBER}"
-                                        '
 
                                         # 檢查 Secret 是否正確創建
                                         echo "=== Checking Kubernetes Secret ==="
