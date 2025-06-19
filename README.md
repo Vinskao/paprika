@@ -162,6 +162,27 @@ The Blade compiler requires a specific cache path for compiled templates. If you
 2. **Verify Directory Permissions**: The `/app/storage/framework/views` directory must be writable
 3. **Validation**: View compiler validation is automatically performed during Docker build and deployment
 
+### Bitnami Laravel Container Specific Issues
+
+**Important**: When using Bitnami Laravel containers with Kubernetes emptyDir volumes, the Bitnami startup script (`/opt/bitnami/scripts/laravel/run.sh`) will clear the `/app/storage` and `/app/bootstrap/cache` directories during container startup.
+
+**Solution**: The deployment includes a `postStart` lifecycle hook that automatically recreates the necessary directories and sets permissions after the Bitnami startup script runs:
+
+```yaml
+lifecycle:
+  postStart:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /app/storage/framework/{views,cache,sessions} && \
+          mkdir -p /app/bootstrap/cache && \
+          chmod -R 777 /app/storage /app/bootstrap/cache
+```
+
+This ensures that Laravel can find the required cache paths even after Bitnami's startup process.
+
 ### Common Issues
 
 1. **Storage directories not found**: The application requires specific Laravel storage directories to exist with proper permissions.
@@ -277,3 +298,176 @@ Error (422):
 
 ### 3. 同步多篇文章
 - **端點**: `POST /api/articles/sync`
+
+# Paprika Laravel Application
+
+A Laravel application deployed with Docker and Kubernetes using Bitnami Laravel image.
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker
+- Kubernetes cluster
+- Jenkins (for CI/CD)
+
+### Local Development
+```bash
+# Clone the repository
+git clone <repository-url>
+cd paprika
+
+# Install dependencies
+composer install
+
+# Copy environment file
+cp .env.template .env
+
+# Generate application key
+php artisan key:generate
+
+# Run migrations
+php artisan migrate
+
+# Start development server
+php artisan serve
+```
+
+## 🐳 Docker Deployment
+
+### Build Image
+```bash
+docker build -t papakao/paprika:latest .
+```
+
+### Run Container
+```bash
+docker run -p 8000:8000 papakao/paprika:latest
+```
+
+## ☸️ Kubernetes Deployment
+
+### Important Notes
+
+#### Bitnami Container Behavior
+The Bitnami Laravel container has specific behavior that affects storage directories:
+
+1. **Storage Directory Clearing**: The container startup script clears `/app/storage` and `/app/bootstrap/cache` directories at runtime, especially when Kubernetes mounts `emptyDir` volumes.
+
+2. **Cache Path Issue**: This can cause Laravel's Blade view compiler to fail with "Please provide a valid cache path" error because the required directories don't exist when Laravel tries to start.
+
+#### Solution: Kubernetes postStart Hook
+The deployment uses a `postStart` lifecycle hook to:
+
+1. **Create Required Directories**: Ensures all necessary Laravel storage directories exist
+2. **Set Permissions**: Sets proper permissions (777) for all storage directories
+3. **Validate Environment**: Tests write permissions to ensure directories are accessible
+
+### Deployment Steps
+
+1. **Build and Push Docker Image**:
+   ```bash
+   docker build -t papakao/paprika:latest .
+   docker push papakao/paprika:latest
+   ```
+
+2. **Deploy to Kubernetes**:
+   ```bash
+   kubectl apply -f k8s/
+   ```
+
+3. **Verify Deployment**:
+   ```bash
+   kubectl get pods -l app=paprika
+   kubectl logs -l app=paprika
+   ```
+
+## 🔧 Configuration
+
+### Environment Variables
+The application uses the following key environment variables:
+
+- `LARAVEL_APP_ENV`: Application environment (production/development)
+- `LARAVEL_APP_DEBUG`: Debug mode (true/false)
+- `LARAVEL_DATABASE_HOST`: Database host
+- `LARAVEL_DATABASE_PORT_NUMBER`: Database port
+- `LARAVEL_DATABASE_NAME`: Database name
+- `LARAVEL_DATABASE_USER`: Database username
+- `LARAVEL_DATABASE_PASSWORD`: Database password
+- `VIEW_COMPILED_PATH`: Blade view compiler cache path
+
+### Storage Configuration
+Laravel storage directories are automatically created by the entrypoint script:
+
+- `/app/storage/framework/views` - Blade compiled views
+- `/app/storage/framework/cache/data` - Application cache
+- `/app/storage/framework/sessions` - Session files
+- `/app/storage/app/public` - Public storage
+- `/app/storage/app/private` - Private storage
+- `/app/storage/logs` - Application logs
+- `/app/bootstrap/cache` - Bootstrap cache
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### 1. "Please provide a valid cache path" Error
+**Symptoms**: Laravel fails to start with cache path error
+**Cause**: Storage directories don't exist or have wrong permissions
+**Solution**: 
+- Check that the postStart hook creates directories correctly
+- Verify Kubernetes volumes are properly mounted
+- Ensure the container has proper permissions to write to storage directories
+
+#### 2. Permission Denied Errors
+**Symptoms**: Laravel can't write to storage directories
+**Cause**: Incorrect file permissions or ownership
+**Solution**:
+- The entrypoint script sets 777 permissions for all storage directories
+- Check that the container runs with appropriate user permissions
+
+#### 3. Environment Variables Not Set
+**Symptoms**: Database connection failures or missing configuration
+**Cause**: Environment variables not properly configured in Kubernetes
+**Solution**:
+- Verify Kubernetes secrets and configmaps are correctly applied
+- Check that environment variables are properly mapped in deployment
+
+### Debug Commands
+
+```bash
+# Check pod status
+kubectl get pods -l app=paprika
+
+# View pod logs
+kubectl logs -l app=paprika
+
+# Execute commands in pod
+kubectl exec -it <pod-name> -- /bin/sh
+
+# Check environment variables
+kubectl exec <pod-name> -- env | grep LARAVEL_
+
+# Verify directory structure
+kubectl exec <pod-name> -- ls -la /app/storage/framework/
+```
+
+## 📝 Development
+
+### Adding New Features
+1. Create feature branch
+2. Implement changes
+3. Update tests
+4. Submit pull request
+
+### Testing
+```bash
+# Run tests
+php artisan test
+
+# Run specific test
+php artisan test --filter TestName
+```
+
+## 📄 License
+
+This project is licensed under the MIT License.
