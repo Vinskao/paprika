@@ -206,14 +206,14 @@ metadata:
   name: paprika-secrets
 type: Opaque
 stringData:
-  LARAVEL_DATABASE_HOST: "${DB_HOST}"
-  LARAVEL_DATABASE_PORT_NUMBER: "${DB_PORT}"
-  LARAVEL_DATABASE_NAME: "${DB_DATABASE}"
-  LARAVEL_DATABASE_USER: "${DB_USERNAME}"
-  LARAVEL_DATABASE_PASSWORD: "${DB_PASSWORD}"
-  LARAVEL_HOST: "${APP_URL}"
+  LARAVEL_DATABASE_HOST: "\${DB_HOST}"
+  LARAVEL_DATABASE_PORT_NUMBER: "\${DB_PORT}"
+  LARAVEL_DATABASE_NAME: "\${DB_DATABASE}"
+  LARAVEL_DATABASE_USER: "\${DB_USERNAME}"
+  LARAVEL_DATABASE_PASSWORD: "\${DB_PASSWORD}"
+  LARAVEL_HOST: "\${APP_URL}"
   LARAVEL_DATABASE_CONNECTION: "pgsql"
-  LARAVEL_APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
+  LARAVEL_APP_KEY: "base64:\${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
 """
                                     writeFile file: 'k8s/secret.yaml', text: secretYaml
 
@@ -227,7 +227,7 @@ data:
   LARAVEL_APP_NAME: "Paprika"
   LARAVEL_APP_ENV: "production"
   LARAVEL_APP_DEBUG: "true"
-  LARAVEL_APP_URL: "${APP_URL}"
+  LARAVEL_APP_URL: "\${APP_URL}"
   LARAVEL_LOG_CHANNEL: "stack"
   LARAVEL_LOG_LEVEL: "debug"
   LARAVEL_CACHE_DRIVER: "file"
@@ -269,20 +269,20 @@ spec:
                   echo "生成 Laravel .env 檔案"
                   cat <<EOF > /app/.env
                   APP_NAME=Paprika
-                  APP_ENV=\$LARAVEL_APP_ENV
-                  APP_KEY=\$LARAVEL_APP_KEY
+                  APP_ENV=\\\$LARAVEL_APP_ENV
+                  APP_KEY=\\\$LARAVEL_APP_KEY
                   APP_DEBUG=true
-                  APP_URL=\$LARAVEL_APP_URL
+                  APP_URL=\\\$LARAVEL_APP_URL
 
                   LOG_CHANNEL=stack
                   LOG_LEVEL=debug
 
                   DB_CONNECTION=pgsql
-                  DB_HOST=\$LARAVEL_DATABASE_HOST
-                  DB_PORT=\$LARAVEL_DATABASE_PORT_NUMBER
-                  DB_DATABASE=\$LARAVEL_DATABASE_NAME
-                  DB_USERNAME=\$LARAVEL_DATABASE_USER
-                  DB_PASSWORD=\$LARAVEL_DATABASE_PASSWORD
+                  DB_HOST=\\\$LARAVEL_DATABASE_HOST
+                  DB_PORT=\\\$LARAVEL_DATABASE_PORT_NUMBER
+                  DB_DATABASE=\\\$LARAVEL_DATABASE_NAME
+                  DB_USERNAME=\\\$LARAVEL_DATABASE_USER
+                  DB_PASSWORD=\\\$LARAVEL_DATABASE_PASSWORD
 
                   CACHE_DRIVER=file
                   QUEUE_CONNECTION=sync
@@ -361,14 +361,14 @@ kind: Ingress
 metadata:
   name: paprika-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
 spec:
   ingressClassName: nginx
   rules:
   - host: peoplesystem.tatdvsonorth.com
     http:
       paths:
-      - path: /paprika(/|$)(.*)
+      - path: /paprika(/|\$)(.*)
         pathType: Prefix
         backend:
           service:
