@@ -78,4 +78,25 @@ echo "=== Environment Variables Check ==="
 kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_ | sort
 
 echo ""
+echo "=== Storage Directory Permissions Check ==="
+kubectl exec $POD_NAME -c paprika -- sh -c '
+    echo "Checking storage directory permissions..."
+    ls -la /app/storage/
+    echo ""
+    echo "Checking storage/framework directory permissions..."
+    ls -la /app/storage/framework/
+    echo ""
+    echo "Checking bootstrap/cache directory permissions..."
+    ls -la /app/bootstrap/cache/
+    echo ""
+    echo "Checking if storage directories are writable..."
+    if [ -w /app/storage ] && [ -w /app/bootstrap/cache ]; then
+        echo "✅ Storage directories are writable"
+    else
+        echo "❌ Storage directories are not writable"
+        exit 1
+    fi
+'
+
+echo ""
 echo "=== Health Check Complete ==="

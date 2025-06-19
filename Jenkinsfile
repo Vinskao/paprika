@@ -79,14 +79,24 @@ pipeline {
                                 exit 1
                             fi
 
+                            # 創建必要的 Laravel 目錄結構
+                            mkdir -p storage/framework/{cache,views,sessions}
+                            mkdir -p storage/app/{public,private}
+                            mkdir -p storage/logs
+                            mkdir -p bootstrap/cache
+
+                            # 創建 k8s 目錄用於 Kubernetes 配置
+                            mkdir -p k8s
+
                             # 安裝 Composer
                             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
                             # 安裝依賴
                             composer install --no-dev --optimize-autoloader
 
-                            # 設置權限
+                            # 設置權限 - 確保所有目錄都有正確權限
                             chmod -R 777 storage bootstrap/cache
+                            chown -R 1001:1001 storage bootstrap/cache 2>/dev/null || true
                         '''
                     }
                 }
@@ -432,6 +442,31 @@ spec:
                                             echo "Application not ready yet, waiting 2 seconds..."
                                             sleep 2
                                         done
+
+                                        # 設置權限和執行 Laravel 維護命令
+                                        echo "=== Setting Permissions and Running Laravel Commands ==="
+                                        kubectl exec $POD_NAME -c paprika -- /bin/sh -c '
+                                            # 確保目錄存在
+                                            mkdir -p /app/storage/framework/views
+                                            mkdir -p /app/storage/framework/cache
+                                            mkdir -p /app/storage/framework/sessions
+                                            mkdir -p /app/storage/app/public
+                                            mkdir -p /app/storage/app/private
+                                            mkdir -p /app/storage/logs
+                                            mkdir -p /app/bootstrap/cache
+
+                                            # 設置權限
+                                            chmod -R 777 /app/storage
+                                            chmod -R 777 /app/bootstrap/cache
+
+                                            # 清除 Laravel 快取
+                                            php artisan cache:clear
+                                            php artisan config:clear
+                                            php artisan view:clear
+                                            php artisan route:clear
+
+                                            echo "✅ Permissions and cache clearing completed"
+                                        '
 
                                         # 動態產生 .env 檔案
                                         echo "=== Generating .env file dynamically ==="

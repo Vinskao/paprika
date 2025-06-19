@@ -123,6 +123,39 @@ docker login
 docker push papakao/paprika:latest
 ```
 
+## Troubleshooting
+
+### Storage Permission Issues
+
+If you encounter storage permission errors in Kubernetes, you can fix them manually:
+
+```bash
+# Get the pod name
+POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
+
+# Create necessary directories and set permissions
+kubectl exec -it $POD_NAME -- mkdir -p /app/storage/framework/views
+kubectl exec -it $POD_NAME -- chmod -R 777 /app/storage
+kubectl exec -it $POD_NAME -- chmod -R 777 /app/bootstrap/cache
+
+# Clear Laravel caches
+kubectl exec -it $POD_NAME -- php artisan cache:clear
+kubectl exec -it $POD_NAME -- php artisan config:clear
+kubectl exec -it $POD_NAME -- php artisan view:clear
+```
+
+Or use the provided fix script:
+```bash
+chmod +x fix-permissions.sh
+./fix-permissions.sh
+```
+
+### Common Issues
+
+1. **Storage directories not found**: The application requires specific Laravel storage directories to exist with proper permissions.
+2. **Permission denied errors**: Ensure storage and bootstrap/cache directories have 777 permissions.
+3. **Cache issues**: Clear Laravel caches after permission changes.
+
 ## API Endpoints
 
 ### 1. 取得所有文章列表
