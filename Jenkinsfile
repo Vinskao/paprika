@@ -206,14 +206,14 @@ metadata:
   name: paprika-secrets
 type: Opaque
 stringData:
-  LARAVEL_DATABASE_HOST: "\${DB_HOST}"
-  LARAVEL_DATABASE_PORT_NUMBER: "\${DB_PORT}"
-  LARAVEL_DATABASE_NAME: "\${DB_DATABASE}"
-  LARAVEL_DATABASE_USER: "\${DB_USERNAME}"
-  LARAVEL_DATABASE_PASSWORD: "\${DB_PASSWORD}"
-  LARAVEL_HOST: "\${APP_URL}"
-  LARAVEL_DATABASE_CONNECTION: "pgsql"
-  LARAVEL_APP_KEY: "base64:\${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
+  LARAVEL_DATABASE_HOST: ${DB_HOST}
+  LARAVEL_DATABASE_PORT_NUMBER: ${DB_PORT}
+  LARAVEL_DATABASE_NAME: ${DB_DATABASE}
+  LARAVEL_DATABASE_USER: ${DB_USERNAME}
+  LARAVEL_DATABASE_PASSWORD: ${DB_PASSWORD}
+  LARAVEL_HOST: ${APP_URL}
+  LARAVEL_DATABASE_CONNECTION: pgsql
+  LARAVEL_APP_KEY: base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}
 """
                                     writeFile file: 'k8s/secret.yaml', text: secretYaml
 
