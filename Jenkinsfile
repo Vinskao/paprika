@@ -172,6 +172,13 @@ pipeline {
                                     string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD'),
                                     string(credentialsId: 'APP_URL', variable: 'APP_URL')
                                 ]) {
+                                    // 執行除錯腳本
+                                    sh '''
+                                        echo "=== Running Environment Debug Script ==="
+                                        chmod +x debug-env.sh
+                                        ./debug-env.sh
+                                    '''
+
                                     // 除錯：檢查環境變數
                                     sh '''
                                         echo "=== Checking Environment Variables ==="
@@ -181,6 +188,17 @@ pipeline {
                                         echo "DB_USERNAME: ${DB_USERNAME}"
                                         echo "DB_PASSWORD: [MASKED]"
                                         echo "APP_URL: ${APP_URL}"
+
+                                        # 驗證 DB_PORT 是否為有效整數
+                                        echo "=== Validating DB_PORT ==="
+                                        if [[ ! "${DB_PORT}" =~ ^[0-9]+$ ]]; then
+                                            echo "ERROR: DB_PORT '${DB_PORT}' is not a valid integer!"
+                                            echo "DB_PORT length: ${#DB_PORT}"
+                                            echo "DB_PORT hex dump:"
+                                            echo "${DB_PORT}" | hexdump -C
+                                            exit 1
+                                        fi
+                                        echo "DB_PORT validation passed: ${DB_PORT}"
                                     '''
 
                                     // 設置環境變數並替換模板
@@ -199,6 +217,12 @@ pipeline {
                                     '''
 
                                     // 使用 Pipeline 變數替換生成 Secret
+                                    // 確保 DB_PORT 是整數並去除可能的空格
+                                    def dbPortClean = DB_PORT.trim()
+                                    if (!dbPortClean.isInteger()) {
+                                        error "ERROR: DB_PORT '${DB_PORT}' is not a valid integer after trimming!"
+                                    }
+
                                     def secretYaml = """
 apiVersion: v1
 kind: Secret
@@ -207,7 +231,7 @@ metadata:
 type: Opaque
 stringData:
   LARAVEL_DATABASE_HOST: ${DB_HOST}
-  LARAVEL_DATABASE_PORT_NUMBER: ${DB_PORT}
+  LARAVEL_DATABASE_PORT_NUMBER: ${dbPortClean}
   LARAVEL_DATABASE_NAME: ${DB_DATABASE}
   LARAVEL_DATABASE_USER: ${DB_USERNAME}
   LARAVEL_DATABASE_PASSWORD: ${DB_PASSWORD}
@@ -215,7 +239,25 @@ stringData:
   LARAVEL_DATABASE_CONNECTION: pgsql
   LARAVEL_APP_KEY: base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}
 """
+
+                                    // 除錯：檢查生成的 Secret YAML
+                                    echo "=== Generated Secret YAML ==="
+                                    echo secretYaml
+
+                                    // 驗證 Secret YAML 中的端口值
+                                    if (!secretYaml.contains("LARAVEL_DATABASE_PORT_NUMBER: ${dbPortClean}")) {
+                                        error "ERROR: Secret YAML does not contain correct DB_PORT value!"
+                                    }
+
                                     writeFile file: 'k8s/secret.yaml', text: secretYaml
+
+                                    // 驗證寫入的檔案
+                                    sh '''
+                                        echo "=== Verifying written secret.yaml ==="
+                                        cat k8s/secret.yaml
+                                        echo "=== Checking for DB_PORT in secret.yaml ==="
+                                        grep "LARAVEL_DATABASE_PORT_NUMBER" k8s/secret.yaml
+                                    '''
 
                                     // 使用 Pipeline 變數替換生成 Deployment
                                     def deploymentYaml = """
@@ -401,6 +443,30 @@ spec:
                                         # 檢查環境變數是否正確設置
                                         echo "=== Checking Pod Environment Variables ==="
                                         kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_
+
+                                        # 詳細檢查 LARAVEL_DATABASE_PORT_NUMBER
+                                        echo "=== Detailed DB_PORT Check ==="
+                                        kubectl exec $POD_NAME -c paprika -- sh -c '
+                                            echo "LARAVEL_DATABASE_PORT_NUMBER value: ${LARAVEL_DATABASE_PORT_NUMBER}"
+                                            echo "LARAVEL_DATABASE_PORT_NUMBER length: ${#LARAVEL_DATABASE_PORT_NUMBER}"
+                                            echo "LARAVEL_DATABASE_PORT_NUMBER hex dump:"
+                                            echo "${LARAVEL_DATABASE_PORT_NUMBER}" | hexdump -C
+
+                                            # 驗證是否為整數
+                                            if [[ ! "${LARAVEL_DATABASE_PORT_NUMBER}" =~ ^[0-9]+$ ]]; then
+                                                echo "ERROR: LARAVEL_DATABASE_PORT_NUMBER is not a valid integer!"
+                                                exit 1
+                                            fi
+                                            echo "LARAVEL_DATABASE_PORT_NUMBER validation passed: ${LARAVEL_DATABASE_PORT_NUMBER}"
+                                        '
+
+                                        # 檢查 Secret 是否正確創建
+                                        echo "=== Checking Kubernetes Secret ==="
+                                        kubectl get secret paprika-secrets -o yaml
+
+                                        # 檢查 Pod 的詳細狀態
+                                        echo "=== Checking Pod Details ==="
+                                        kubectl describe pod $POD_NAME
                                     '''
                                 }
                             } catch (Exception e) {
