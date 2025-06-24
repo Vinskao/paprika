@@ -14,6 +14,74 @@ http://127.0.0.1:8000/api/articles
 https://peoplesystem.tatdvsonorth.com/paprika/api/articles
 ```
 
+## Local Docker Testing
+
+### Quick Start
+
+```bash
+# Build the Docker image
+docker build -t paprika:prod .
+
+### Testing with Database (Production-like)
+
+```bash
+# Run with actual database configuration
+docker run -d \
+  --name paprika-with-db \
+  -p 8000:8000 \
+  -e LARAVEL_APP_ENV=production \
+  -e LARAVEL_APP_DEBUG=true \
+  -e LARAVEL_APP_URL=http://localhost:8000 \
+  -e LARAVEL_DATABASE_CONNECTION=pgsql \
+  -e LARAVEL_DATABASE_HOST=peoplesystem.tatdvsonorth.com \
+  -e LARAVEL_DATABASE_PORT_NUMBER=30000 \
+  -e LARAVEL_DATABASE_NAME=peoplesystem \
+  -e LARAVEL_DATABASE_USER=wavo \
+  -e LARAVEL_DATABASE_PASSWORD=Wawi247525= \
+  -e LARAVEL_CACHE_DRIVER=file \
+  -e LARAVEL_SESSION_DRIVER=file \
+  -e LARAVEL_SESSION_LIFETIME=120 \
+  -e LARAVEL_FILESYSTEM_DISK=local \
+  paprika:prod
+```
+
+### Testing the Application
+
+```bash
+# Check if the container is running
+docker ps
+
+# View container logs
+docker logs paprika-dev
+
+# Test the health endpoint
+curl http://localhost:8000/up
+
+# Test the API endpoint
+curl http://localhost:8000/api/articles
+
+# Access the container shell
+docker exec -it paprika-dev /bin/sh
+```
+
+### Environment Variables
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `LARAVEL_APP_ENV` | Application environment | `production` | `local` |
+| `LARAVEL_APP_DEBUG` | Enable debug mode | `false` | `true` |
+| `LARAVEL_APP_URL` | Application URL | `http://localhost:8000` | `http://localhost:8000` |
+| `LARAVEL_DATABASE_CONNECTION` | Database connection type | `pgsql` | `pgsql` |
+| `LARAVEL_DATABASE_HOST` | Database host | `localhost` | `peoplesystem.tatdvsonorth.com` |
+| `LARAVEL_DATABASE_PORT_NUMBER` | Database port | `5432` | `30000` |
+| `LARAVEL_DATABASE_NAME` | Database name | `laravel` | `peoplesystem` |
+| `LARAVEL_DATABASE_USER` | Database username | `postgres` | `wavo` |
+| `LARAVEL_DATABASE_PASSWORD` | Database password | (empty) | `Wawi247525=` |
+| `LARAVEL_CACHE_DRIVER` | Cache driver | `file` | `file` |
+| `LARAVEL_SESSION_DRIVER` | Session driver | `file` | `file` |
+| `LARAVEL_SESSION_LIFETIME` | Session lifetime | `120` | `120` |
+| `LARAVEL_FILESYSTEM_DISK` | Filesystem disk | `local` | `local` |
+
 ## Setup Instructions
 
 1. Configure the database connection in `.env`:
@@ -260,22 +328,6 @@ Error (422):
 }
 ```
 
-## Business Logic
-
-- Accepts batch of articles in single request
-- For each article, compares file_date with existing record
-- Only updates if incoming file_date is newer than stored file_date
-- Creates new record if file_path doesn't exist
-- Skips update if incoming file_date is older or equal
-- Returns detailed sync statistics
-
-## Validation Rules
-
-- articles: required|array
-- articles.*.file_path: required|string|max:500
-- articles.*.content: required|string
-- articles.*.file_date: required|date
-
 ## Error Handling
 
 - Implements try-catch for database operations
@@ -332,55 +384,6 @@ php artisan migrate
 php artisan serve
 ```
 
-## 🐳 Docker Deployment
-
-### Build Image
-```bash
-docker build -t papakao/paprika:latest .
-```
-
-### Run Container
-```bash
-docker run -p 8000:8000 papakao/paprika:latest
-```
-
-## ☸️ Kubernetes Deployment
-
-### Important Notes
-
-#### Bitnami Container Behavior
-The Bitnami Laravel container has specific behavior that affects storage directories:
-
-1. **Storage Directory Clearing**: The container startup script clears `/app/storage` and `/app/bootstrap/cache` directories at runtime, especially when Kubernetes mounts `emptyDir` volumes.
-
-2. **Cache Path Issue**: This can cause Laravel's Blade view compiler to fail with "Please provide a valid cache path" error because the required directories don't exist when Laravel tries to start.
-
-#### Solution: Kubernetes postStart Hook
-The deployment uses a `postStart` lifecycle hook to:
-
-1. **Create Required Directories**: Ensures all necessary Laravel storage directories exist
-2. **Set Permissions**: Sets proper permissions (777) for all storage directories
-3. **Validate Environment**: Tests write permissions to ensure directories are accessible
-
-### Deployment Steps
-
-1. **Build and Push Docker Image**:
-   ```bash
-   docker build -t papakao/paprika:latest .
-   docker push papakao/paprika:latest
-   ```
-
-2. **Deploy to Kubernetes**:
-   ```bash
-   kubectl apply -f k8s/
-   ```
-
-3. **Verify Deployment**:
-   ```bash
-   kubectl get pods -l app=paprika
-   kubectl logs -l app=paprika
-   ```
-
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -406,68 +409,8 @@ Laravel storage directories are automatically created by the entrypoint script:
 - `/app/storage/logs` - Application logs
 - `/app/bootstrap/cache` - Bootstrap cache
 
-## 🐛 Troubleshooting
 
-### Common Issues
-
-#### 1. "Please provide a valid cache path" Error
-**Symptoms**: Laravel fails to start with cache path error
-**Cause**: Storage directories don't exist or have wrong permissions
-**Solution**: 
-- Check that the postStart hook creates directories correctly
-- Verify Kubernetes volumes are properly mounted
-- Ensure the container has proper permissions to write to storage directories
-
-#### 2. Permission Denied Errors
-**Symptoms**: Laravel can't write to storage directories
-**Cause**: Incorrect file permissions or ownership
-**Solution**:
-- The entrypoint script sets 777 permissions for all storage directories
-- Check that the container runs with appropriate user permissions
-
-#### 3. Environment Variables Not Set
-**Symptoms**: Database connection failures or missing configuration
-**Cause**: Environment variables not properly configured in Kubernetes
-**Solution**:
-- Verify Kubernetes secrets and configmaps are correctly applied
-- Check that environment variables are properly mapped in deployment
-
-### Debug Commands
-
+## Debug in Laravel
 ```bash
-# Check pod status
-kubectl get pods -l app=paprika
-
-# View pod logs
-kubectl logs -l app=paprika
-
-# Execute commands in pod
-kubectl exec -it <pod-name> -- /bin/sh
-
-# Check environment variables
-kubectl exec <pod-name> -- env | grep LARAVEL_
-
-# Verify directory structure
-kubectl exec <pod-name> -- ls -la /app/storage/framework/
+tail -n 50 /app/storage/logs/laravel.log
 ```
-
-## 📝 Development
-
-### Adding New Features
-1. Create feature branch
-2. Implement changes
-3. Update tests
-4. Submit pull request
-
-### Testing
-```bash
-# Run tests
-php artisan test
-
-# Run specific test
-php artisan test --filter TestName
-```
-
-## 📄 License
-
-This project is licensed under the MIT License.

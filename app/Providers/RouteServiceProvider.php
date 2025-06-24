@@ -25,15 +25,6 @@ class RouteServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Log::info('RouteServiceProvider booting');
-
-        $this->routes(function () {
-            Route::middleware('api')
-                ->prefix('paprika')
-                ->group(base_path('routes/api.php'));
-
-            Route::middleware('web')
-                ->group(base_path('routes/web.php'));
-        });
+        //
     }
 }

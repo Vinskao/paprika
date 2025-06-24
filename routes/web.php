@@ -2,4 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 
-// 這個文件保持空白，因為我們只使用 API 路由
+// 只保留健康檢查端點
+Route::get('/up', function () {
+    return response()->json(['status' => 'ok']);
+});
