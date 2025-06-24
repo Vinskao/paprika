@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+TROUBLESHOOTING.md
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js (if any)
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Testing
+.phpunit.result.cache
+tests
+phpunit.xml
+
+# Development
+.env.example
+.env.local
+.env.testing
+
+# Logs
+storage/logs/*
+!storage/logs/.gitkeep
+
+# Cache
+storage/framework/cache/*
+!storage/framework/cache/.gitkeep
+storage/framework/sessions/*
+!storage/framework/sessions/.gitkeep
+storage/framework/views/*
+!storage/framework/views/.gitkeep
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.override.yml
+
+# Kubernetes
+k8s/
+*.yaml
+*.yml
+
+# Jenkins
+Jenkinsfile
+
+# Temporary files
+*.tmp
+*.temp

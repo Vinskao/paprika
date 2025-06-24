@@ -103,41 +103,6 @@ pipeline {
             }
         }
 
-        stage('Debug Environment') {
-            steps {
-                container('kubectl') {
-                    script {
-                        echo "=== Listing all environment variables ==="
-                        sh 'printenv | sort'
-
-                        echo "=== Checking Jenkins environment variables ==="
-                        sh '''
-                            echo "BUILD_NUMBER: ${BUILD_NUMBER}"
-                            echo "BUILD_ID: ${BUILD_ID}"
-                            echo "BUILD_URL: ${BUILD_URL}"
-                            echo "JOB_NAME: ${JOB_NAME}"
-                            echo "JOB_BASE_NAME: ${JOB_BASE_NAME}"
-                            echo "WORKSPACE: ${WORKSPACE}"
-                            echo "JENKINS_HOME: ${JENKINS_HOME}"
-                            echo "JENKINS_URL: ${JENKINS_URL}"
-                            echo "EXECUTOR_NUMBER: ${EXECUTOR_NUMBER}"
-                            echo "NODE_NAME: ${NODE_NAME}"
-                            echo "NODE_LABELS: ${NODE_LABELS}"
-                            echo "PATH: ${PATH}"
-                            echo "SHELL: ${SHELL}"
-                            echo "HOME: ${HOME}"
-                            echo "USER: ${USER}"
-                            echo "DOCKER_IMAGE: ${DOCKER_IMAGE}"
-                            echo "DOCKER_TAG: ${DOCKER_TAG}"
-                            echo "APP_ENV: ${APP_ENV}"
-                            echo "APP_DEBUG: ${APP_DEBUG}"
-                            echo "LOG_LEVEL: ${LOG_LEVEL}"
-                        '''
-                    }
-                }
-            }
-        }
-
         stage('Build Docker Image with BuildKit') {
             steps {
                 container('docker') {
@@ -182,13 +147,6 @@ pipeline {
                                     string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD'),
                                     string(credentialsId: 'APP_URL', variable: 'APP_URL')
                                 ]) {
-                                    // 執行除錯腳本
-                                    sh '''
-                                        echo "=== Running Environment Debug Script ==="
-                                        chmod +x debug-env.sh
-                                        ./debug-env.sh
-                                    '''
-
                                     // 除錯：檢查環境變數
                                     sh '''
                                         echo "=== Checking Environment Variables ==="
@@ -211,28 +169,13 @@ pipeline {
                                         echo "DB_PORT validation passed: ${DB_PORT}"
                                     '''
 
-                                    // 設置環境變數並替換模板
-                                    sh '''
-                                        # Export Jenkins Credentials 為符合 Kubernetes Secret 名稱的環境變數
-                                        export LARAVEL_DB_HOST="${DB_HOST}"
-                                        export LARAVEL_DB_PORT="${DB_PORT}"
-                                        export LARAVEL_DB_DATABASE="${DB_DATABASE}"
-                                        export LARAVEL_DB_USERNAME="${DB_USERNAME}"
-                                        export LARAVEL_DB_PASSWORD="${DB_PASSWORD}"
-                                        export LARAVEL_APP_URL="${APP_URL}"
-
-                                        # 檢查環境變數是否正確設置
-                                        echo "=== Checking Environment Variables ==="
-                                        env | grep LARAVEL_
-                                    '''
-
-                                    // 使用 Pipeline 變數替換生成 Secret
                                     // 確保 DB_PORT 是整數並去除可能的空格
                                     def dbPortClean = DB_PORT.trim()
                                     if (!dbPortClean.isInteger()) {
                                         error "ERROR: DB_PORT '${DB_PORT}' is not a valid integer after trimming!"
                                     }
 
+                                    // 生成 Secret（移除 LARAVEL_ 前綴）
                                     def secretYaml = """
 apiVersion: v1
 kind: Secret
@@ -240,55 +183,38 @@ metadata:
   name: paprika-secrets
 type: Opaque
 stringData:
-  LARAVEL_DATABASE_HOST: "${DB_HOST}"
-  LARAVEL_DATABASE_PORT_NUMBER: "${dbPortClean}"
-  LARAVEL_DATABASE_NAME: "${DB_DATABASE}"
-  LARAVEL_DATABASE_USER: "${DB_USERNAME}"
-  LARAVEL_DATABASE_PASSWORD: "${DB_PASSWORD}"
-  LARAVEL_HOST: "${APP_URL}"
-  LARAVEL_DATABASE_CONNECTION: "pgsql"
-  LARAVEL_APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
+  DATABASE_HOST: "${DB_HOST}"
+  DATABASE_PORT_NUMBER: "${dbPortClean}"
+  DATABASE_NAME: "${DB_DATABASE}"
+  DATABASE_USER: "${DB_USERNAME}"
+  DATABASE_PASSWORD: "${DB_PASSWORD}"
+  APP_URL: "${APP_URL}"
+  DATABASE_CONNECTION: "pgsql"
+  APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
 """
-
-                                    // 除錯：檢查生成的 Secret YAML
-                                    echo "=== Generated Secret YAML ==="
-                                    echo secretYaml
-
-                                    // 驗證 Secret YAML 中的端口值
-                                    if (!secretYaml.contains("LARAVEL_DATABASE_PORT_NUMBER: \"${dbPortClean}\"")) {
-                                        error "ERROR: Secret YAML does not contain correct DB_PORT value in string format!"
-                                    }
 
                                     writeFile file: 'k8s/secret.yaml', text: secretYaml
 
-                                    // 驗證寫入的檔案
-                                    sh '''
-                                        echo "=== Verifying written secret.yaml ==="
-                                        cat k8s/secret.yaml
-                                        echo "=== Checking for DB_PORT in secret.yaml ==="
-                                        grep "LARAVEL_DATABASE_PORT_NUMBER" k8s/secret.yaml
-                                    '''
-
-                                    // 使用 Pipeline 變數替換生成 Deployment
+                                    // 生成 Deployment（移除 LARAVEL_ 前綴，對應 Docker 部署方式）
                                     def deploymentYaml = """
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: paprika-config
 data:
-  LARAVEL_APP_NAME: "Paprika"
-  LARAVEL_APP_ENV: "production"
-  LARAVEL_APP_DEBUG: "true"
-  LARAVEL_APP_URL: "\${APP_URL}"
-  LARAVEL_LOG_CHANNEL: "stack"
-  LARAVEL_LOG_LEVEL: "debug"
-  LARAVEL_CACHE_DRIVER: "file"
-  LARAVEL_FILESYSTEM_DISK: "local"
-  LARAVEL_SESSION_DRIVER: "file"
-  LARAVEL_SESSION_LIFETIME: "120"
-  LARAVEL_DATABASE_CONNECTION: "pgsql"
-  LARAVEL_BROADCAST_DRIVER: "log"
-  LARAVEL_QUEUE_CONNECTION: "sync"
+  APP_NAME: "Paprika"
+  APP_ENV: "production"
+  APP_DEBUG: "true"
+  APP_URL: "${APP_URL}"
+  LOG_CHANNEL: "stack"
+  LOG_LEVEL: "debug"
+  CACHE_DRIVER: "file"
+  FILESYSTEM_DISK: "local"
+  SESSION_DRIVER: "file"
+  SESSION_LIFETIME: "120"
+  DATABASE_CONNECTION: "pgsql"
+  BROADCAST_DRIVER: "log"
+  QUEUE_CONNECTION: "sync"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -315,36 +241,36 @@ spec:
         - configMapRef:
             name: paprika-config
         env:
-        - name: LARAVEL_DATABASE_HOST
+        - name: DATABASE_HOST
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_DATABASE_HOST
-        - name: LARAVEL_DATABASE_PORT_NUMBER
+              key: DATABASE_HOST
+        - name: DATABASE_PORT_NUMBER
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_DATABASE_PORT_NUMBER
-        - name: LARAVEL_DATABASE_NAME
+              key: DATABASE_PORT_NUMBER
+        - name: DATABASE_NAME
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_DATABASE_NAME
-        - name: LARAVEL_DATABASE_USER
+              key: DATABASE_NAME
+        - name: DATABASE_USER
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_DATABASE_USER
-        - name: LARAVEL_DATABASE_PASSWORD
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_DATABASE_PASSWORD
-        - name: LARAVEL_APP_KEY
+              key: DATABASE_PASSWORD
+        - name: APP_KEY
           valueFrom:
             secretKeyRef:
               name: paprika-secrets
-              key: LARAVEL_APP_KEY
+              key: APP_KEY
         lifecycle:
           postStart:
             exec:
@@ -429,10 +355,6 @@ spec:
                                         POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
                                         kubectl describe pod $POD_NAME
 
-                                        # 檢查 Pod 重啟次數
-                                        echo "=== Checking Pod Restart Count ==="
-                                        kubectl get pods -l app=paprika -o jsonpath="{.items[0].status.containerStatuses[0].restartCount}"
-
                                         # 等待應用完全啟動
                                         echo "=== Waiting for Laravel Application to be Ready ==="
                                         for i in {1..30}; do
@@ -457,15 +379,11 @@ spec:
 
                                         # 檢查環境變數是否正確設置
                                         echo "=== Checking Pod Environment Variables ==="
-                                        kubectl exec $POD_NAME -c paprika -- env | grep LARAVEL_
+                                        kubectl exec $POD_NAME -c paprika -- env | grep -E "(APP_|DATABASE_|CACHE_|SESSION_)"
 
                                         # 檢查 Secret 是否正確創建
                                         echo "=== Checking Kubernetes Secret ==="
                                         kubectl get secret paprika-secrets -o yaml
-
-                                        # 檢查 Pod 的詳細狀態
-                                        echo "=== Checking Pod Details ==="
-                                        kubectl describe pod $POD_NAME
                                     '''
                                 }
                             } catch (Exception e) {
