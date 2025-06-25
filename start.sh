@@ -2,17 +2,54 @@
 
 echo "🚀 Starting Laravel application..."
 
+# 🔍 Volume 掛載後檢查：加入診斷輸出
+echo "📦 Contents of /app/storage after mount:"
+ls -alR /app/storage || echo "❌ /app/storage is missing or not mounted!"
+
 # 確保關鍵目錄存在（按照建議的順序）
 echo "📁 Creating essential Laravel directories..."
-mkdir -p /app/storage/framework/sessions
-mkdir -p /app/storage/framework/views
-mkdir -p /app/storage/framework/cache
-mkdir -p /app/storage/framework/cache/data
+
+# 🔁 防止 Volume 蓋掉後目錄消失 - 檢查並重建所有必要目錄
+if [ ! -d /app/storage/framework/sessions ]; then
+    echo "📁 Recreating missing /app/storage/framework/sessions..."
+    mkdir -p /app/storage/framework/sessions
+fi
+
+if [ ! -d /app/storage/framework/views ]; then
+    echo "📁 Recreating missing /app/storage/framework/views..."
+    mkdir -p /app/storage/framework/views
+fi
+
+if [ ! -d /app/storage/framework/cache ]; then
+    echo "📁 Recreating missing /app/storage/framework/cache..."
+    mkdir -p /app/storage/framework/cache
+fi
+
+if [ ! -d /app/storage/framework/cache/data ]; then
+    echo "📁 Recreating missing /app/storage/framework/cache/data..."
+    mkdir -p /app/storage/framework/cache/data
+fi
+
+# 額外檢查其他可能需要的目錄
+if [ ! -d /app/storage/logs ]; then
+    echo "📁 Recreating missing /app/storage/logs..."
+    mkdir -p /app/storage/logs
+fi
+
+if [ ! -d /app/bootstrap/cache ]; then
+    echo "📁 Recreating missing /app/bootstrap/cache..."
+    mkdir -p /app/bootstrap/cache
+fi
 
 # 設置權限
 echo "🔧 Setting permissions..."
 chmod -R 777 /app/storage /app/bootstrap/cache
 chown -R www-data:www-data /app/storage /app/bootstrap/cache
+
+# 再次檢查目錄狀態
+echo "🔍 Final directory check after creation:"
+ls -al /app/storage/framework/ || echo "❌ /app/storage/framework/ still missing!"
+ls -al /app/bootstrap/cache/ || echo "❌ /app/bootstrap/cache/ still missing!"
 
 # 生成 .env 文件（如果不存在）
 if [ ! -f /app/.env ]; then
