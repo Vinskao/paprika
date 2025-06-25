@@ -103,7 +103,7 @@ pipeline {
 
                             # 驗證 Laravel 核心類是否可用
                             echo "🔍 Validating Laravel core classes..."
-                            if ! php -r "require_once 'vendor/autoload.php'; class_exists('Illuminate\Foundation\Application') ? exit(0) : exit(1);" 2>/dev/null; then
+                            if ! php -r "require_once 'vendor/autoload.php'; class_exists('Illuminate\\\\Foundation\\\\Application') ? exit(0) : exit(1);" 2>/dev/null; then
                                 echo "❌ Laravel core classes not found, attempting to fix..."
                                 composer dump-autoload --optimize
                                 composer run-script post-autoload-dump --no-interaction
