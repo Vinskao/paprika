@@ -79,11 +79,15 @@ pipeline {
                                 exit 1
                             fi
 
-                            # 創建必要的 Laravel 目錄結構
-                            mkdir -p storage/framework/{cache/data,views,sessions}
-                            mkdir -p storage/app/{public,private}
-                            mkdir -p storage/logs
-                            mkdir -p bootstrap/cache
+                            # ✅ 正確建立 Laravel 必要目錄
+                            mkdir -p \
+                              storage/framework/cache/data \
+                              storage/framework/views \
+                              storage/framework/sessions \
+                              storage/app/public \
+                              storage/app/private \
+                              storage/logs \
+                              bootstrap/cache
 
                             # 安裝 Composer
                             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -299,6 +303,16 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: APP_URL
+        - name: LARAVEL_DATABASE_CONNECTION
+          value: "pgsql"
+        - name: LARAVEL_CACHE_DRIVER
+          value: "file"
+        - name: LARAVEL_SESSION_DRIVER
+          value: "file"
+        - name: LARAVEL_SESSION_LIFETIME
+          value: "120"
+        - name: LARAVEL_FILESYSTEM_DISK
+          value: "local"
         lifecycle:
           postStart:
             exec:
