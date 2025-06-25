@@ -98,15 +98,54 @@ SESSION_LIFETIME=${LARAVEL_SESSION_LIFETIME:-120}
 BROADCAST_DRIVER=${LARAVEL_BROADCAST_DRIVER:-log}
 FILESYSTEM_DISK=${LARAVEL_FILESYSTEM_DISK:-local}
 
-# 明確設置視圖緩存路徑
+# 明確設置視圖緩存路徑 - 這是關鍵設置！
 VIEW_COMPILED_PATH=/app/storage/framework/views
 EOF
+else
+    # 如果 .env 已存在，確保 VIEW_COMPILED_PATH 設置正確
+    echo "🔧 Ensuring VIEW_COMPILED_PATH is set in existing .env..."
+    if ! grep -q "^VIEW_COMPILED_PATH=" /app/.env; then
+        echo "VIEW_COMPILED_PATH=/app/storage/framework/views" >> /app/.env
+        echo "✅ Added VIEW_COMPILED_PATH to existing .env"
+    else
+        # 更新現有的 VIEW_COMPILED_PATH
+        sed -i 's|^VIEW_COMPILED_PATH=.*|VIEW_COMPILED_PATH=/app/storage/framework/views|' /app/.env
+        echo "✅ Updated VIEW_COMPILED_PATH in existing .env"
+    fi
+fi
+
+# 驗證 .env 設置
+echo "🔍 Verifying .env configuration..."
+if grep -q "^VIEW_COMPILED_PATH=/app/storage/framework/views" /app/.env; then
+    echo "✅ VIEW_COMPILED_PATH correctly set in .env"
+else
+    echo "❌ VIEW_COMPILED_PATH not found or incorrect in .env"
+    echo "Current .env VIEW_COMPILED_PATH setting:"
+    grep "VIEW_COMPILED_PATH" /app/.env || echo "Not found"
 fi
 
 # 檢查並生成 APP_KEY（如果不存在或無效）
 if ! grep -q "^APP_KEY=base64:" /app/.env || grep -q "^APP_KEY=$" /app/.env; then
     echo "🔑 Generating application key..."
     php artisan key:generate --force
+fi
+
+# 測試 VIEW_COMPILED_PATH 設置
+echo "🔍 Testing VIEW_COMPILED_PATH configuration..."
+if php -r "
+require_once '/app/vendor/autoload.php';
+require_once '/app/bootstrap/app.php';
+\$app = require_once '/app/bootstrap/app.php';
+echo 'view.compiled: ' . \$app['config']['view.compiled'] . PHP_EOL;
+" 2>/dev/null; then
+    echo "✅ VIEW_COMPILED_PATH test passed"
+else
+    echo "❌ VIEW_COMPILED_PATH test failed, attempting to fix..."
+    # 強制設置環境變數
+    export VIEW_COMPILED_PATH=/app/storage/framework/views
+    export LARAVEL_VIEW_COMPILED_PATH=/app/storage/framework/views
+    echo "VIEW_COMPILED_PATH=/app/storage/framework/views" >> /app/.env
+    echo "LARAVEL_VIEW_COMPILED_PATH=/app/storage/framework/views" >> /app/.env
 fi
 
 # 清除緩存

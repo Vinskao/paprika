@@ -338,6 +338,8 @@ spec:
           value: "120"
         - name: LARAVEL_FILESYSTEM_DISK
           value: "local"
+        - name: VIEW_COMPILED_PATH
+          value: "/app/storage/framework/views"
         lifecycle:
           postStart:
             exec:
