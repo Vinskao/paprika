@@ -85,9 +85,6 @@ pipeline {
                             mkdir -p storage/logs
                             mkdir -p bootstrap/cache
 
-                            # 創建 k8s 目錄用於 Kubernetes 配置
-                            mkdir -p k8s
-
                             # 安裝 Composer
                             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
@@ -147,8 +144,12 @@ pipeline {
                                     string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD'),
                                     string(credentialsId: 'APP_URL', variable: 'APP_URL')
                                 ]) {
-                                    // 除錯：檢查環境變數
+                                    // 創建 k8s 目錄並設置權限
                                     sh '''
+                                        # 創建 k8s 目錄用於 Kubernetes 配置
+                                        mkdir -p k8s
+                                        chmod 755 k8s
+
                                         echo "=== Checking Environment Variables ==="
                                         echo "DB_HOST: ${DB_HOST}"
                                         echo "DB_PORT: ${DB_PORT}"
@@ -159,7 +160,7 @@ pipeline {
 
                                         # 驗證 DB_PORT 是否為有效整數
                                         echo "=== Validating DB_PORT ==="
-                                        if [[ ! "${DB_PORT}" =~ ^[0-9]+$ ]]; then
+                                        if ! echo "${DB_PORT}" | grep -E "^[0-9]+$" > /dev/null; then
                                             echo "ERROR: DB_PORT '${DB_PORT}' is not a valid integer!"
                                             echo "DB_PORT length: ${#DB_PORT}"
                                             echo "DB_PORT hex dump:"
