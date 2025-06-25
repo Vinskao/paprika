@@ -92,8 +92,24 @@ pipeline {
                             # 安裝 Composer
                             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-                            # 安裝依賴
-                            composer install --no-dev --optimize-autoloader
+                            # 安裝依賴（使用 --no-scripts 避免執行 Laravel 腳本）
+                            echo "🔧 Installing Composer dependencies..."
+                            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+                            # 重新生成 autoload 文件並執行 Laravel 腳本
+                            echo "🔄 Regenerating autoload files..."
+                            composer dump-autoload --optimize
+                            composer run-script post-autoload-dump --no-interaction
+
+                            # 驗證 Laravel 核心類是否可用
+                            echo "🔍 Validating Laravel core classes..."
+                            if ! php -r "require_once 'vendor/autoload.php'; class_exists('Illuminate\Foundation\Application') ? exit(0) : exit(1);" 2>/dev/null; then
+                                echo "❌ Laravel core classes not found, attempting to fix..."
+                                composer dump-autoload --optimize
+                                composer run-script post-autoload-dump --no-interaction
+                            else
+                                echo "✅ Laravel core classes validated successfully"
+                            fi
 
                             # 設置權限 - 確保所有目錄都有正確權限
                             chmod -R 777 storage bootstrap/cache
