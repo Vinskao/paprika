@@ -283,7 +283,7 @@ spec:
     spec:
       containers:
       - name: paprika
-        image: ${DOCKER_IMAGE}:${DOCKER_TAG}
+        image: \${DOCKER_IMAGE}:\${DOCKER_TAG}
         ports:
         - containerPort: 8000
         env:
@@ -394,14 +394,14 @@ kind: Ingress
 metadata:
   name: paprika-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /\\$2
+    nginx.ingress.kubernetes.io/rewrite-target: /\\\$2
 spec:
   ingressClassName: nginx
   rules:
   - host: peoplesystem.tatdvsonorth.com
     http:
       paths:
-      - path: /paprika(/|\\$)(.*)
+      - path: /paprika(/|\\\$)(.*)
         pathType: Prefix
         backend:
           service:
