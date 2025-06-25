@@ -65,8 +65,17 @@ fi
 # 優化應用
 echo "⚡ Optimizing application..."
 php artisan config:cache
+
+# 強制重新生成路由緩存，確保 bootstrap/app.php 的配置被應用
+echo "🔄 Regenerating route cache..."
+php artisan route:clear
 php artisan route:cache
+
 php artisan view:cache
+
+# 驗證路由配置
+echo "🔍 Verifying route configuration..."
+php artisan route:list --compact
 
 echo "✅ Laravel application is ready!"
 echo "🌐 Application URL: ${LARAVEL_APP_URL:-http://localhost:8000}"
