@@ -221,27 +221,33 @@ EOF
                                         fi
                                     '''
 
-                                    // 生成 Deployment（移除 LARAVEL_ 前綴，對應 Docker 部署方式）
+                                    // 生成 Deployment（移除 LARAVEL_ 前綴）
                                     sh """
                                         cat > k8s/deployment.yaml << 'EOF'
+# Persistent Volume Claims
 apiVersion: v1
-kind: ConfigMap
+kind: PersistentVolumeClaim
 metadata:
-  name: paprika-config
-data:
-  APP_NAME: "Paprika"
-  APP_ENV: "production"
-  APP_DEBUG: "true"
-  APP_URL: "${APP_URL}"
-  LOG_CHANNEL: "stack"
-  LOG_LEVEL: "debug"
-  CACHE_DRIVER: "file"
-  FILESYSTEM_DISK: "local"
-  SESSION_DRIVER: "file"
-  SESSION_LIFETIME: "120"
-  DATABASE_CONNECTION: "pgsql"
-  BROADCAST_DRIVER: "log"
-  QUEUE_CONNECTION: "sync"
+  name: paprika-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: paprika-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -261,13 +267,16 @@ spec:
     spec:
       containers:
       - name: paprika
-        image: papakao/paprika:latest
+        image: ${DOCKER_IMAGE}:${DOCKER_TAG}
         ports:
         - containerPort: 8000
-        envFrom:
-        - configMapRef:
-            name: paprika-config
         env:
+        - name: LARAVEL_APP_ENV
+          value: "production"
+        - name: LARAVEL_APP_DEBUG
+          value: "false"
+        - name: LARAVEL_LOG_LEVEL
+          value: "info"
         - name: LARAVEL_DATABASE_HOST
           valueFrom:
             secretKeyRef:
@@ -320,12 +329,20 @@ spec:
                 - /bin/sh
                 - -c
                 - |
+                  echo "🔍 Volume 掛載後檢查："
+                  ls -alR /app/storage || echo "❌ /app/storage is missing or not mounted!"
+
+                  echo "📁 重建必要的 Laravel 目錄..."
                   mkdir -p /app/storage/framework/{views,cache/data,sessions} && \\
                   mkdir -p /app/storage/app/{public,private} && \\
                   mkdir -p /app/storage/logs && \\
                   mkdir -p /app/bootstrap/cache && \\
                   chmod -R 777 /app/storage /app/bootstrap/cache && \\
                   echo "✅ PostStart: Laravel directories created and permissions set"
+
+                  echo "🔍 最終目錄檢查："
+                  ls -al /app/storage/framework/ || echo "❌ /app/storage/framework/ still missing!"
+                  ls -al /app/bootstrap/cache/ || echo "❌ /app/bootstrap/cache/ still missing!"
         volumeMounts:
         - name: storage
           mountPath: /app/storage
@@ -333,9 +350,11 @@ spec:
           mountPath: /app/bootstrap/cache
       volumes:
       - name: storage
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: paprika-storage
       - name: cache
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: paprika-cache
 ---
 apiVersion: v1
 kind: Service
