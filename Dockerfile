@@ -29,15 +29,17 @@ COPY . .
 # 安裝依賴
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# 創建必要的目錄結構
-RUN mkdir -p storage/framework/{cache/data,views,sessions} \
-    && mkdir -p storage/app/{public,private} \
-    && mkdir -p storage/logs \
-    && mkdir -p bootstrap/cache
-
-# 設置權限
-RUN chmod -R 777 storage bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+# 建立必要目錄並設置權限
+RUN mkdir -p \
+    storage/framework/cache/data \
+    storage/framework/views \
+    storage/framework/sessions \
+    storage/app/public \
+    storage/app/private \
+    storage/logs \
+    bootstrap/cache \
+ && chmod -R 777 storage bootstrap/cache \
+ && chown -R www-data:www-data storage bootstrap/cache
 
 # 複製 Nginx 配置
 COPY nginx.conf /etc/nginx/nginx.conf

@@ -2,7 +2,18 @@
 
 echo "🚀 Starting Laravel application..."
 
+# 雙重保險：建立必要目錄（防止 volume mount 蓋掉它們）
+echo "📁 Creating necessary directories..."
+mkdir -p /app/storage/framework/cache/data \
+         /app/storage/framework/views \
+         /app/storage/framework/sessions \
+         /app/storage/app/public \
+         /app/storage/app/private \
+         /app/storage/logs \
+         /app/bootstrap/cache
+
 # 設置權限
+echo "🔧 Setting permissions..."
 chmod -R 777 /app/storage /app/bootstrap/cache
 chown -R www-data:www-data /app/storage /app/bootstrap/cache
 
