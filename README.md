@@ -222,43 +222,6 @@ The application uses file-based caching by default. Ensure these directories exi
 - `/app/storage/framework/sessions` - Session files
 - `/app/bootstrap/cache` - Application cache
 
-### View Compiler Issues
-
-The Blade compiler requires a specific cache path for compiled templates. If you encounter "Please provide a valid cache path" errors:
-
-1. **Check View Compiler Path**: Ensure `VIEW_COMPILED_PATH` environment variable is set
-2. **Verify Directory Permissions**: The `/app/storage/framework/views` directory must be writable
-3. **Validation**: View compiler validation is automatically performed during Docker build and deployment
-
-### Bitnami Laravel Container Specific Issues
-
-**Important**: When using Bitnami Laravel containers with Kubernetes emptyDir volumes, the Bitnami startup script (`/opt/bitnami/scripts/laravel/run.sh`) will clear the `/app/storage` and `/app/bootstrap/cache` directories during container startup.
-
-**Solution**: The deployment includes a `postStart` lifecycle hook that automatically recreates the necessary directories and sets permissions after the Bitnami startup script runs:
-
-```yaml
-lifecycle:
-  postStart:
-    exec:
-      command:
-        - /bin/sh
-        - -c
-        - |
-          mkdir -p /app/storage/framework/{views,cache,sessions} && \
-          mkdir -p /app/bootstrap/cache && \
-          chmod -R 777 /app/storage /app/bootstrap/cache
-```
-
-This ensures that Laravel can find the required cache paths even after Bitnami's startup process.
-
-### Common Issues
-
-1. **Storage directories not found**: The application requires specific Laravel storage directories to exist with proper permissions.
-2. **Permission denied errors**: Ensure storage and bootstrap/cache directories have 777 permissions.
-3. **Cache issues**: Clear Laravel caches after permission changes.
-4. **Blade compiler cache path errors**: Ensure `/app/storage/framework/cache/data` directory exists and is writable.
-5. **View compiler cache path errors**: Ensure `/app/storage/framework/views` directory exists and is writable, and `VIEW_COMPILED_PATH` is set correctly.
-
 ## API Endpoints
 
 ### 1. 取得所有文章列表
