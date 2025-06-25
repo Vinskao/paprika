@@ -2,15 +2,12 @@
 
 echo "🚀 Starting Laravel application..."
 
-# 雙重保險：建立必要目錄（防止 volume mount 蓋掉它們）
-echo "📁 Creating necessary directories..."
-mkdir -p /app/storage/framework/cache/data \
-         /app/storage/framework/views \
-         /app/storage/framework/sessions \
-         /app/storage/app/public \
-         /app/storage/app/private \
-         /app/storage/logs \
-         /app/bootstrap/cache
+# 確保關鍵目錄存在（按照建議的順序）
+echo "📁 Creating essential Laravel directories..."
+mkdir -p /app/storage/framework/sessions
+mkdir -p /app/storage/framework/views
+mkdir -p /app/storage/framework/cache
+mkdir -p /app/storage/framework/cache/data
 
 # 設置權限
 echo "🔧 Setting permissions..."
@@ -46,6 +43,9 @@ SESSION_LIFETIME=${LARAVEL_SESSION_LIFETIME:-120}
 
 BROADCAST_DRIVER=${LARAVEL_BROADCAST_DRIVER:-log}
 FILESYSTEM_DISK=${LARAVEL_FILESYSTEM_DISK:-local}
+
+# 明確設置視圖緩存路徑
+VIEW_COMPILED_PATH=/app/storage/framework/views
 EOF
 fi
 
@@ -55,16 +55,11 @@ if ! grep -q "^APP_KEY=base64:" /app/.env || grep -q "^APP_KEY=$" /app/.env; the
     php artisan key:generate --force
 fi
 
-# 確保權限正確設置
-echo "🔧 Setting permissions..."
-chmod -R 777 /app/storage /app/bootstrap/cache
-chown -R www-data:www-data /app/storage /app/bootstrap/cache
-
 # 清除緩存
 echo "🧹 Clearing caches..."
 php artisan config:clear
 php artisan cache:clear || echo "⚠️  Cache clear failed, continuing..."
-php artisan view:clear
+php artisan view:clear || echo "⚠️  View clear failed, continuing..."
 php artisan route:clear
 
 # 運行數據庫遷移（如果設置了數據庫）
@@ -82,7 +77,9 @@ echo "🔄 Regenerating route cache..."
 php artisan route:clear
 php artisan route:cache
 
-php artisan view:cache
+# 生成視圖緩存
+echo "🎨 Generating view cache..."
+php artisan view:cache || echo "⚠️  View cache generation failed, but continuing..."
 
 # 驗證路由配置
 echo "🔍 Verifying route configuration..."

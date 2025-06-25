@@ -31,9 +31,10 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # 建立必要目錄並設置權限
 RUN mkdir -p \
-    storage/framework/cache/data \
-    storage/framework/views \
     storage/framework/sessions \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/framework/cache/data \
     storage/app/public \
     storage/app/private \
     storage/logs \
