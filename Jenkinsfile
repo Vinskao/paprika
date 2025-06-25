@@ -177,7 +177,10 @@ pipeline {
                                     }
 
                                     // 生成 Secret（移除 LARAVEL_ 前綴）
-                                    def secretYaml = """
+                                    def appKey = sh(script: 'openssl rand -base64 32', returnStdout: true).trim()
+
+                                    sh """
+                                        cat > k8s/secret.yaml << 'EOF'
 apiVersion: v1
 kind: Secret
 metadata:
@@ -191,13 +194,32 @@ stringData:
   DATABASE_PASSWORD: "${DB_PASSWORD}"
   APP_URL: "${APP_URL}"
   DATABASE_CONNECTION: "pgsql"
-  APP_KEY: "base64:${sh(script: 'openssl rand -base64 32', returnStdout: true).trim()}"
-"""
+  APP_KEY: "base64:${appKey}"
+EOF
+                                    """
 
-                                    writeFile file: 'k8s/secret.yaml', text: secretYaml
+                                    // 調試：檢查 secret.yaml 文件
+                                    sh '''
+                                        echo "=== Debug: Checking secret.yaml file ==="
+                                        echo "Current directory: $(pwd)"
+                                        echo "k8s directory contents:"
+                                        ls -la k8s/
+
+                                        if [ -f "k8s/secret.yaml" ]; then
+                                            echo "✅ secret.yaml file exists"
+                                            echo "File size: $(wc -c < k8s/secret.yaml) bytes"
+                                            echo "File permissions: $(ls -la k8s/secret.yaml)"
+                                            echo "First 10 lines of secret.yaml:"
+                                            head -10 k8s/secret.yaml
+                                        else
+                                            echo "❌ secret.yaml file does not exist!"
+                                            exit 1
+                                        fi
+                                    '''
 
                                     // 生成 Deployment（移除 LARAVEL_ 前綴，對應 Docker 部署方式）
-                                    def deploymentYaml = """
+                                    sh """
+                                        cat > k8s/deployment.yaml << 'EOF'
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -279,11 +301,11 @@ spec:
                 - /bin/sh
                 - -c
                 - |
-                  mkdir -p /app/storage/framework/{views,cache/data,sessions} && \
-                  mkdir -p /app/storage/app/{public,private} && \
-                  mkdir -p /app/storage/logs && \
-                  mkdir -p /app/bootstrap/cache && \
-                  chmod -R 777 /app/storage /app/bootstrap/cache && \
+                  mkdir -p /app/storage/framework/{views,cache/data,sessions} && \\
+                  mkdir -p /app/storage/app/{public,private} && \\
+                  mkdir -p /app/storage/logs && \\
+                  mkdir -p /app/bootstrap/cache && \\
+                  chmod -R 777 /app/storage /app/bootstrap/cache && \\
                   echo "✅ PostStart: Laravel directories created and permissions set"
         volumeMounts:
         - name: storage
@@ -316,25 +338,61 @@ kind: Ingress
 metadata:
   name: paprika-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/rewrite-target: /\\$2
 spec:
   ingressClassName: nginx
   rules:
   - host: peoplesystem.tatdvsonorth.com
     http:
       paths:
-      - path: /paprika(/|\$)(.*)
+      - path: /paprika(/|\\$)(.*)
         pathType: Prefix
         backend:
           service:
             name: paprika
             port:
               number: 80
-"""
-                                    writeFile file: 'k8s/deployment.yaml', text: deploymentYaml
+EOF
+                                    """
+
+                                    // 調試：檢查 deployment.yaml 文件
+                                    sh '''
+                                        echo "=== Debug: Checking deployment.yaml file ==="
+                                        if [ -f "k8s/deployment.yaml" ]; then
+                                            echo "✅ deployment.yaml file exists"
+                                            echo "File size: $(wc -c < k8s/deployment.yaml) bytes"
+                                            echo "File permissions: $(ls -la k8s/deployment.yaml)"
+                                            echo "First 10 lines of deployment.yaml:"
+                                            head -10 k8s/deployment.yaml
+                                        else
+                                            echo "❌ deployment.yaml file does not exist!"
+                                            exit 1
+                                        fi
+
+                                        echo "=== Debug: Final k8s directory check ==="
+                                        echo "k8s directory contents:"
+                                        ls -la k8s/
+                                        echo "Total files in k8s directory: $(ls k8s/ | wc -l)"
+                                    '''
 
                                     // 應用 Kubernetes 配置
                                     sh '''
+                                        # 驗證 YAML 文件語法
+                                        echo "=== Validating YAML files syntax ==="
+                                        if kubectl apply --dry-run=client -f k8s/secret.yaml; then
+                                            echo "✅ secret.yaml syntax is valid"
+                                        else
+                                            echo "❌ secret.yaml syntax is invalid"
+                                            exit 1
+                                        fi
+
+                                        if kubectl apply --dry-run=client -f k8s/deployment.yaml; then
+                                            echo "✅ deployment.yaml syntax is valid"
+                                        else
+                                            echo "❌ deployment.yaml syntax is invalid"
+                                            exit 1
+                                        fi
+
                                         # 應用 Secret
                                         echo "=== Applying Kubernetes Secret ==="
                                         kubectl apply -f k8s/secret.yaml
