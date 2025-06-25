@@ -6,6 +6,23 @@ echo "🚀 Starting Laravel application..."
 echo "📦 Contents of /app/storage after mount:"
 ls -alR /app/storage || echo "❌ /app/storage is missing or not mounted!"
 
+# 🔧 修復 Composer 依賴問題
+echo "🔧 Checking and fixing Composer dependencies..."
+if [ ! -d "/app/vendor" ] || [ ! -f "/app/vendor/autoload.php" ]; then
+    echo "❌ Vendor directory missing or incomplete, reinstalling dependencies..."
+    composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+    composer dump-autoload --optimize
+    composer run-script post-autoload-dump --no-interaction
+fi
+
+# 驗證 Laravel 核心類是否可用
+echo "🔍 Validating Laravel core classes..."
+if ! php -r "require_once '/app/vendor/autoload.php'; class_exists('Illuminate\Foundation\Application') ? exit(0) : exit(1);" 2>/dev/null; then
+    echo "❌ Laravel core classes not found, attempting to fix..."
+    composer dump-autoload --optimize
+    composer run-script post-autoload-dump --no-interaction
+fi
+
 # 確保關鍵目錄存在（按照建議的順序）
 echo "📁 Creating essential Laravel directories..."
 

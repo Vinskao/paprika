@@ -23,11 +23,18 @@ WORKDIR /app
 # 安裝 Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# 複製 composer.json 和 composer.lock 文件
+COPY composer.json composer.lock ./
+
+# 安裝依賴（使用 --no-scripts 避免執行 Laravel 腳本）
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
 # 複製整個專案文件
 COPY . .
 
-# 安裝依賴
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# 重新生成 autoload 文件並執行 Laravel 腳本
+RUN composer dump-autoload --optimize && \
+    composer run-script post-autoload-dump --no-interaction
 
 # 建立必要目錄並設置權限
 RUN mkdir -p \
