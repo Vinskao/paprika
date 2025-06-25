@@ -65,6 +65,7 @@ ENV LARAVEL_APP_ENV=production
 ENV VIEW_COMPILED_PATH=/app/storage/framework/views
 ENV CACHE_DRIVER=file
 ENV SESSION_DRIVER=file
+ENV LARAVEL_VIEW_COMPILED_PATH=/app/storage/framework/views
 
 # 健康檢查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
