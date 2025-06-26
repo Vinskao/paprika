@@ -480,6 +480,17 @@ EOF
                                         echo "=== Creating host directories for persistent volumes ==="
                                         kubectl get nodes -o name | head -1 | xargs -I {} kubectl debug {} -it --image=busybox -- mkdir -p /data/paprika-storage /data/paprika-cache || echo "Warning: Could not create host directories"
 
+                                        # 刪除現有的 PVC（解決 immutable 問題）
+                                        echo "=== Deleting existing PVCs to resolve immutable spec issue ==="
+                                        kubectl delete pvc paprika-storage --ignore-not-found
+                                        kubectl delete pvc paprika-cache --ignore-not-found
+                                        echo "✅ Existing PVCs deleted (if they existed)"
+
+                                        # 等待 PVC 完全刪除
+                                        echo "=== Waiting for PVCs to be fully deleted ==="
+                                        kubectl wait --for=delete pvc/paprika-storage --timeout=30s 2>/dev/null || echo "paprika-storage PVC already deleted"
+                                        kubectl wait --for=delete pvc/paprika-cache --timeout=30s 2>/dev/null || echo "paprika-cache PVC already deleted"
+
                                         # 驗證 YAML 文件語法
                                         echo "=== Validating YAML files syntax ==="
                                         if kubectl apply --dry-run=client -f k8s/secret.yaml; then
@@ -500,9 +511,19 @@ EOF
                                         echo "=== Applying Kubernetes Secret ==="
                                         kubectl apply -f k8s/secret.yaml
 
-                                        # 應用 Deployment
+                                        # 應用 Deployment（包含新的 PVC）
                                         echo "=== Applying Kubernetes Deployment ==="
                                         kubectl apply -f k8s/deployment.yaml
+
+                                        # 檢查 PVC 狀態
+                                        echo "=== Checking PVC status ==="
+                                        kubectl get pvc paprika-storage paprika-cache
+
+                                        # 等待 PVC 綁定
+                                        echo "=== Waiting for PVCs to be bound ==="
+                                        kubectl wait --for=condition=Bound pvc/paprika-storage --timeout=60s
+                                        kubectl wait --for=condition=Bound pvc/paprika-cache --timeout=60s
+                                        echo "✅ PVCs are bound successfully"
 
                                         # 等待 Pod 就緒
                                         echo "=== Waiting for Pod to be Ready ==="
