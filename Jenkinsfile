@@ -492,6 +492,10 @@ EOF
 
                                     // 應用 Kubernetes 配置
                                     sh '''
+                                        # 獲取第一個節點名稱（在 script 塊中重新獲取）
+                                        FIRST_NODE=$(kubectl get nodes -o name | head -1 | cut -d'/' -f2)
+                                        echo "Using node for scheduling: $FIRST_NODE"
+
                                         # 創建主機目錄（在所有節點上）
                                         echo "=== Creating host directories for persistent volumes on all nodes ==="
                                         for NODE_NAME in $(kubectl get nodes -o name | cut -d'/' -f2); do
@@ -499,8 +503,6 @@ EOF
                                             kubectl debug node/$NODE_NAME -it --image=busybox -- /bin/sh -c "mkdir -p /data/paprika-storage /data/paprika-cache && chmod 777 /data/paprika-storage /data/paprika-cache" || echo "Warning: Could not create host directories on $NODE_NAME"
                                         done
                                         echo "✅ Host directories creation attempted on all nodes"
-
-                                        echo "Using node for scheduling: ${FIRST_NODE}"
 
                                         # 強制刪除現有的 Pod（確保沒有 Pod 在使用 PVC）
                                         echo "=== Force deleting existing Pods to release PVC bindings ==="
@@ -565,15 +567,15 @@ EOF
                                         echo "=== Debug: Checking envsubst output ==="
                                         echo "DOCKER_IMAGE: ${DOCKER_IMAGE}"
                                         echo "DOCKER_TAG: ${DOCKER_TAG}"
-                                        echo "FIRST_NODE: ${FIRST_NODE}"
+                                        echo "FIRST_NODE: $FIRST_NODE"
                                         echo "Full image name: ${DOCKER_IMAGE}:${DOCKER_TAG}"
 
                                         # 預覽替換後的內容
                                         echo "=== Preview of processed deployment.yaml ==="
                                         envsubst < k8s/deployment.yaml | grep -A 5 -B 5 "image:" || echo "No image line found"
 
-                                        # 應用部署
-                                        envsubst < k8s/deployment.yaml | kubectl apply -f -
+                                        # 應用部署（使用 shell 變數進行替換）
+                                        FIRST_NODE="$FIRST_NODE" envsubst < k8s/deployment.yaml | kubectl apply -f -
 
                                         # 檢查 PVC 狀態
                                         echo "=== Checking PVC status ==="
