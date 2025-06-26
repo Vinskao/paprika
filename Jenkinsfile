@@ -492,17 +492,34 @@ EOF
                                         echo "=== Creating host directories for persistent volumes ==="
                                         kubectl get nodes -o name | head -1 | xargs -I {} kubectl debug {} -it --image=busybox -- mkdir -p /data/paprika-storage /data/paprika-cache || echo "Warning: Could not create host directories"
 
-                                        # 刪除現有的 PVC（解決 immutable 問題）
-                                        echo "=== Deleting existing PVCs to resolve immutable spec issue ==="
-                                        kubectl delete pvc paprika-storage --ignore-not-found
-                                        kubectl delete pvc paprika-cache --ignore-not-found
-                                        echo "✅ Existing PVCs deleted (if they existed)"
+                                        # 強制刪除現有的 Pod（確保沒有 Pod 在使用 PVC）
+                                        echo "=== Force deleting existing Pods to release PVC bindings ==="
+                                        kubectl delete pod -l app=paprika --force --grace-period=0 --ignore-not-found
+                                        echo "✅ Existing Pods force deleted (if they existed)"
 
-                                        # 刪除對應的 PV（解決綁定關係問題）
-                                        echo "=== Deleting existing PVs to resolve binding issues ==="
-                                        kubectl delete pv paprika-storage-pv --ignore-not-found
-                                        kubectl delete pv paprika-cache-pv --ignore-not-found
-                                        echo "✅ Existing PVs deleted (if they existed)"
+                                        # 等待 Pod 完全刪除
+                                        echo "=== Waiting for Pods to be fully deleted ==="
+                                        kubectl wait --for=delete pod -l app=paprika --timeout=30s 2>/dev/null || echo "Pods already deleted"
+
+                                        # Step 1: 強制刪除 PVCs（先移除 finalizer）
+                                        echo "=== Force deleting PVCs with finalizer removal ==="
+                                        kubectl patch pvc paprika-storage -p '{"metadata":{"finalizers":null}}' --type=merge || true
+                                        kubectl delete pvc paprika-storage --force --grace-period=0 --ignore-not-found
+                                        echo "✅ paprika-storage PVC force deleted"
+
+                                        kubectl patch pvc paprika-cache -p '{"metadata":{"finalizers":null}}' --type=merge || true
+                                        kubectl delete pvc paprika-cache --force --grace-period=0 --ignore-not-found
+                                        echo "✅ paprika-cache PVC force deleted"
+
+                                        # Step 2: 強制刪除 PVs（先移除 finalizer）
+                                        echo "=== Force deleting PVs with finalizer removal ==="
+                                        kubectl patch pv paprika-storage-pv -p '{"metadata":{"finalizers":null}}' --type=merge || true
+                                        kubectl delete pv paprika-storage-pv --force --grace-period=0 --ignore-not-found
+                                        echo "✅ paprika-storage-pv force deleted"
+
+                                        kubectl patch pv paprika-cache-pv -p '{"metadata":{"finalizers":null}}' --type=merge || true
+                                        kubectl delete pv paprika-cache-pv --force --grace-period=0 --ignore-not-found
+                                        echo "✅ paprika-cache-pv force deleted"
 
                                         # 等待 PVC 和 PV 完全刪除
                                         echo "=== Waiting for PVCs and PVs to be fully deleted ==="
