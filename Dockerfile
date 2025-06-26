@@ -27,7 +27,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY composer.json composer.lock ./
 
 # 安裝依賴（使用 --no-scripts 避免執行 Laravel 腳本）
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache
 
 # 複製整個專案文件
 COPY . .

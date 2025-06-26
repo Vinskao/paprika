@@ -89,12 +89,16 @@ pipeline {
                               storage/logs \
                               bootstrap/cache
 
+                            # 設置權限 - 確保所有目錄都有正確權限
+                            chmod -R 777 storage bootstrap/cache
+                            chown -R 1001:1001 storage bootstrap/cache 2>/dev/null || true
+
                             # 安裝 Composer
                             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
                             # 安裝依賴（使用 --no-scripts 避免執行 Laravel 腳本）
                             echo "🔧 Installing Composer dependencies..."
-                            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+                            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache
 
                             # 重新生成 autoload 文件並執行 Laravel 腳本
                             echo "🔄 Regenerating autoload files..."
@@ -110,10 +114,6 @@ pipeline {
                             else
                                 echo "✅ Laravel core classes validated successfully"
                             fi
-
-                            # 設置權限 - 確保所有目錄都有正確權限
-                            chmod -R 777 storage bootstrap/cache
-                            chown -R 1001:1001 storage bootstrap/cache 2>/dev/null || true
                         '''
                     }
                 }
