@@ -249,7 +249,7 @@ EOF
                                         fi
                                     '''
 
-                                    // 生成 Deployment（移除 LARAVEL_ 前綴）
+                                    // 生成 Deployment（使用 envsubst 進行變數替換）
                                     sh """
                                         cat > k8s/deployment.yaml << 'EOF'
 # Persistent Volumes
@@ -463,6 +463,18 @@ EOF
                                             echo "File permissions: $(ls -la k8s/deployment.yaml)"
                                             echo "First 10 lines of deployment.yaml:"
                                             head -10 k8s/deployment.yaml
+
+                                            echo "=== Checking Docker image variable replacement ==="
+                                            if grep -q "\${DOCKER_IMAGE}:\${DOCKER_TAG}" k8s/deployment.yaml; then
+                                                echo "✅ Docker image variables found in deployment.yaml (before envsubst)"
+                                                echo "DOCKER_IMAGE: ${DOCKER_IMAGE}"
+                                                echo "DOCKER_TAG: ${DOCKER_TAG}"
+                                                echo "Full image name: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                                            else
+                                                echo "❌ Docker image variables NOT found in deployment.yaml"
+                                                echo "Checking for literal variable names..."
+                                                grep -n "DOCKER_IMAGE\|DOCKER_TAG" k8s/deployment.yaml || echo "No variable references found"
+                                            fi
                                         else
                                             echo "❌ deployment.yaml file does not exist!"
                                             exit 1
@@ -513,7 +525,19 @@ EOF
 
                                         # 應用 Deployment（包含新的 PVC）
                                         echo "=== Applying Kubernetes Deployment ==="
-                                        kubectl apply -f k8s/deployment.yaml
+
+                                        # 調試：檢查 envsubst 輸出
+                                        echo "=== Debug: Checking envsubst output ==="
+                                        echo "DOCKER_IMAGE: ${DOCKER_IMAGE}"
+                                        echo "DOCKER_TAG: ${DOCKER_TAG}"
+                                        echo "Full image name: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+
+                                        # 預覽替換後的內容
+                                        echo "=== Preview of processed deployment.yaml ==="
+                                        envsubst < k8s/deployment.yaml | grep -A 5 -B 5 "image:" || echo "No image line found"
+
+                                        # 應用部署
+                                        envsubst < k8s/deployment.yaml | kubectl apply -f -
 
                                         # 檢查 PVC 狀態
                                         echo "=== Checking PVC status ==="
