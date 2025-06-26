@@ -23,11 +23,23 @@ WORKDIR /app
 # 安裝 Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# 配置 Composer 強制使用 dist 包
+RUN composer config -g preferred-install dist && \
+    composer config -g github-protocols https
+
+# 設置環境變數禁用 Git 操作
+ENV COMPOSER_DISABLE_GIT=1
+ENV COMPOSER_PREFER_DIST=1
+
 # 複製 composer.json 和 composer.lock 文件
 COPY composer.json composer.lock ./
 
-# 安裝依賴（使用 --no-scripts 避免執行 Laravel 腳本）
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache
+# 安裝依賴（強制使用 dist 包）
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache || \
+    (echo "First attempt failed, trying with different settings..." && \
+     composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache --no-plugins) || \
+    (echo "Second attempt failed, trying with minimal settings..." && \
+     composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache --no-plugins --no-autoloader)
 
 # 複製整個專案文件
 COPY . .
