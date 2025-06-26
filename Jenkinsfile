@@ -498,10 +498,18 @@ EOF
                                         kubectl delete pvc paprika-cache --ignore-not-found
                                         echo "✅ Existing PVCs deleted (if they existed)"
 
-                                        # 等待 PVC 完全刪除
-                                        echo "=== Waiting for PVCs to be fully deleted ==="
+                                        # 刪除對應的 PV（解決綁定關係問題）
+                                        echo "=== Deleting existing PVs to resolve binding issues ==="
+                                        kubectl delete pv paprika-storage-pv --ignore-not-found
+                                        kubectl delete pv paprika-cache-pv --ignore-not-found
+                                        echo "✅ Existing PVs deleted (if they existed)"
+
+                                        # 等待 PVC 和 PV 完全刪除
+                                        echo "=== Waiting for PVCs and PVs to be fully deleted ==="
                                         kubectl wait --for=delete pvc/paprika-storage --timeout=30s 2>/dev/null || echo "paprika-storage PVC already deleted"
                                         kubectl wait --for=delete pvc/paprika-cache --timeout=30s 2>/dev/null || echo "paprika-cache PVC already deleted"
+                                        kubectl wait --for=delete pv/paprika-storage-pv --timeout=30s 2>/dev/null || echo "paprika-storage-pv already deleted"
+                                        kubectl wait --for=delete pv/paprika-cache-pv --timeout=30s 2>/dev/null || echo "paprika-cache-pv already deleted"
 
                                         # 驗證 YAML 文件語法
                                         echo "=== Validating YAML files syntax ==="
