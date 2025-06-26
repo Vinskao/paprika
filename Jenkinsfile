@@ -473,7 +473,7 @@ EOF
                                             else
                                                 echo "❌ Docker image variables NOT found in deployment.yaml"
                                                 echo "Checking for literal variable names..."
-                                                grep -n "DOCKER_IMAGE\|DOCKER_TAG" k8s/deployment.yaml || echo "No variable references found"
+                                                grep -n "DOCKER_IMAGE\\|DOCKER_TAG" k8s/deployment.yaml || echo "No variable references found"
                                             fi
                                         else
                                             echo "❌ deployment.yaml file does not exist!"
