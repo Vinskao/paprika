@@ -48,6 +48,8 @@
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
+        "prefer-dist": true,
+        "github-protocols": ["https"],
         "sort-packages": true
     },
     "minimum-stability": "stable",

@@ -96,9 +96,21 @@ pipeline {
                             # 安裝 Composer
                             curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-                            # 安裝依賴（使用 --no-scripts 避免執行 Laravel 腳本）
+                            # 配置 Composer 強制使用 dist 包
+                            composer config -g preferred-install dist
+                            composer config -g github-protocols https
+
+                            # 設置環境變數禁用 Git 操作
+                            export COMPOSER_DISABLE_GIT=1
+                            export COMPOSER_PREFER_DIST=1
+
+                            # 安裝依賴（強制使用 dist 包）
                             echo "🔧 Installing Composer dependencies..."
-                            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache
+                            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache || \
+                            (echo "First attempt failed, trying with different settings..." && \
+                             composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache --no-plugins) || \
+                            (echo "Second attempt failed, trying with minimal settings..." && \
+                             composer install --no-dev --optimize-autoloader --no-interaction --no-scripts --prefer-dist --no-cache --no-plugins --no-autoloader)
 
                             # 重新生成 autoload 文件並執行 Laravel 腳本
                             echo "🔄 Regenerating autoload files..."
