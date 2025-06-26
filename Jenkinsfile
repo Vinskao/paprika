@@ -252,6 +252,35 @@ EOF
                                     // 生成 Deployment（移除 LARAVEL_ 前綴）
                                     sh """
                                         cat > k8s/deployment.yaml << 'EOF'
+# Persistent Volumes
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: paprika-storage-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/paprika-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: paprika-cache-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /data/paprika-cache
+---
 # Persistent Volume Claims
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -263,7 +292,8 @@ spec:
   resources:
     requests:
       storage: 10Gi
-  storageClassName: standard
+  storageClassName: manual
+  volumeName: paprika-storage-pv
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -275,7 +305,8 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: standard
+  storageClassName: manual
+  volumeName: paprika-cache-pv
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -445,6 +476,10 @@ EOF
 
                                     // 應用 Kubernetes 配置
                                     sh '''
+                                        # 創建主機目錄（如果不存在）
+                                        echo "=== Creating host directories for persistent volumes ==="
+                                        kubectl get nodes -o name | head -1 | xargs -I {} kubectl debug {} -it --image=busybox -- mkdir -p /data/paprika-storage /data/paprika-cache || echo "Warning: Could not create host directories"
+
                                         # 驗證 YAML 文件語法
                                         echo "=== Validating YAML files syntax ==="
                                         if kubectl apply --dry-run=client -f k8s/secret.yaml; then
