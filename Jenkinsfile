@@ -365,7 +365,7 @@ kind: Ingress
 metadata:
   name: paprika-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /paprika/\$2
 spec:
   ingressClassName: nginx
   rules:
