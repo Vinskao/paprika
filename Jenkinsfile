@@ -249,10 +249,6 @@ EOF
                                         fi
                                     '''
 
-                                    // 獲取第一個節點名稱
-                                    def firstNode = sh(script: 'kubectl get nodes -o name | head -1 | cut -d\'/\' -f2', returnStdout: true).trim()
-                                    echo "FIRST_NODE: $firstNode"
-
                                     // 生成 Deployment（使用 envsubst 進行變數替換）
                                     sh """
                                         cat > k8s/deployment.yaml << 'EOF'
