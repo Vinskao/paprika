@@ -653,6 +653,7 @@ EOF
                                         echo "=== Checking Kubernetes Secret ==="
                                         kubectl get secret paprika-secrets -o yaml
                                     '''
+                                }
                             } catch (Exception e) {
                                 echo "Error during deployment: ${e.message}"
                                 throw e
