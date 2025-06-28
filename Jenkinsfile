@@ -372,7 +372,7 @@ spec:
   - host: peoplesystem.tatdvsonorth.com
     http:
       paths:
-      - path: /paprika(/|$)(.*)
+      - path: /paprika(/|\$)(.*)
         pathType: Prefix
         backend:
           service:
