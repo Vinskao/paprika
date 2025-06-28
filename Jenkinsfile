@@ -252,60 +252,6 @@ EOF
                                     // 生成 Deployment（使用 envsubst 進行變數替換）
                                     sh """
                                         cat > k8s/deployment.yaml << 'EOF'
-# Persistent Volumes
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: paprika-storage-pv
-spec:
-  capacity:
-    storage: 10Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Delete
-  storageClassName: manual
-  hostPath:
-    path: /data/paprika-storage
----
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: paprika-cache-pv
-spec:
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Delete
-  storageClassName: manual
-  hostPath:
-    path: /data/paprika-cache
----
-# Persistent Volume Claims
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: paprika-storage
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: manual
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: paprika-cache
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: manual
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -372,15 +318,15 @@ spec:
         - name: LARAVEL_DATABASE_CONNECTION
           value: "pgsql"
         - name: LARAVEL_CACHE_DRIVER
-          value: "file"
+          value: "array"
         - name: LARAVEL_SESSION_DRIVER
-          value: "file"
+          value: "array"
         - name: LARAVEL_SESSION_LIFETIME
           value: "120"
         - name: LARAVEL_FILESYSTEM_DISK
           value: "local"
         - name: VIEW_COMPILED_PATH
-          value: "/app/storage/framework/views"
+          value: "/tmp/views"
         lifecycle:
           postStart:
             exec:
@@ -388,32 +334,16 @@ spec:
                 - /bin/sh
                 - -c
                 - |
-                  echo "🔍 Volume 掛載後檢查："
-                  ls -alR /app/storage || echo "❌ /app/storage is missing or not mounted!"
+                  echo "🔍 檢查應用目錄結構..."
+                  ls -la /app/
 
-                  echo "📁 重建必要的 Laravel 目錄..."
-                  mkdir -p /app/storage/framework/{views,cache/data,sessions} && \\
-                  mkdir -p /app/storage/app/{public,private} && \\
-                  mkdir -p /app/storage/logs && \\
-                  mkdir -p /app/bootstrap/cache && \\
-                  chmod -R 777 /app/storage /app/bootstrap/cache && \\
-                  echo "✅ PostStart: Laravel directories created and permissions set"
+                  echo "📁 創建臨時目錄..."
+                  mkdir -p /tmp/views /tmp/cache /tmp/sessions /tmp/logs
+                  chmod -R 777 /tmp/views /tmp/cache /tmp/sessions /tmp/logs
+                  echo "✅ PostStart: 臨時目錄創建完成"
 
                   echo "🔍 最終目錄檢查："
-                  ls -al /app/storage/framework/ || echo "❌ /app/storage/framework/ still missing!"
-                  ls -al /app/bootstrap/cache/ || echo "❌ /app/bootstrap/cache/ still missing!"
-        volumeMounts:
-        - name: storage
-          mountPath: /app/storage
-        - name: cache
-          mountPath: /app/bootstrap/cache
-      volumes:
-      - name: storage
-        persistentVolumeClaim:
-          claimName: paprika-storage
-      - name: cache
-        persistentVolumeClaim:
-          claimName: paprika-cache
+                  ls -al /tmp/
 ---
 apiVersion: v1
 kind: Service
@@ -510,49 +440,14 @@ EOF
 
                                     // 應用 Kubernetes 配置
                                     sh '''
-                                        # 創建主機目錄（在所有節點上）
-                                        echo "=== Creating host directories for persistent volumes on all nodes ==="
-                                        for NODE_NAME in $(kubectl get nodes -o name | cut -d'/' -f2); do
-                                            echo "Creating directories on node: $NODE_NAME"
-                                            kubectl debug node/$NODE_NAME -it --image=busybox -- /bin/sh -c "mkdir -p /data/paprika-storage /data/paprika-cache && chmod 777 /data/paprika-storage /data/paprika-cache" || echo "Warning: Could not create host directories on $NODE_NAME"
-                                        done
-                                        echo "✅ Host directories creation attempted on all nodes"
-
-                                        # 強制刪除現有的 Pod（確保沒有 Pod 在使用 PVC）
-                                        echo "=== Force deleting existing Pods to release PVC bindings ==="
+                                        # 強制刪除現有的 Pod（確保重新部署）
+                                        echo "=== Force deleting existing Pods to ensure fresh deployment ==="
                                         kubectl delete pod -l app=paprika --force --grace-period=0 --ignore-not-found
                                         echo "✅ Existing Pods force deleted (if they existed)"
 
                                         # 等待 Pod 完全刪除
                                         echo "=== Waiting for Pods to be fully deleted ==="
                                         kubectl wait --for=delete pod -l app=paprika --timeout=30s 2>/dev/null || echo "Pods already deleted"
-
-                                        # Step 1: 強制刪除 PVCs（先移除 finalizer）
-                                        echo "=== Force deleting PVCs with finalizer removal ==="
-                                        kubectl patch pvc paprika-storage -p '{"metadata":{"finalizers":null}}' --type=merge || true
-                                        kubectl delete pvc paprika-storage --force --grace-period=0 --ignore-not-found
-                                        echo "✅ paprika-storage PVC force deleted"
-
-                                        kubectl patch pvc paprika-cache -p '{"metadata":{"finalizers":null}}' --type=merge || true
-                                        kubectl delete pvc paprika-cache --force --grace-period=0 --ignore-not-found
-                                        echo "✅ paprika-cache PVC force deleted"
-
-                                        # Step 2: 強制刪除 PVs（先移除 finalizer）
-                                        echo "=== Force deleting PVs with finalizer removal ==="
-                                        kubectl patch pv paprika-storage-pv -p '{"metadata":{"finalizers":null}}' --type=merge || true
-                                        kubectl delete pv paprika-storage-pv --force --grace-period=0 --ignore-not-found
-                                        echo "✅ paprika-storage-pv force deleted"
-
-                                        kubectl patch pv paprika-cache-pv -p '{"metadata":{"finalizers":null}}' --type=merge || true
-                                        kubectl delete pv paprika-cache-pv --force --grace-period=0 --ignore-not-found
-                                        echo "✅ paprika-cache-pv force deleted"
-
-                                        # 等待 PVC 和 PV 完全刪除
-                                        echo "=== Waiting for PVCs and PVs to be fully deleted ==="
-                                        kubectl wait --for=delete pvc/paprika-storage --timeout=30s 2>/dev/null || echo "paprika-storage PVC already deleted"
-                                        kubectl wait --for=delete pvc/paprika-cache --timeout=30s 2>/dev/null || echo "paprika-cache PVC already deleted"
-                                        kubectl wait --for=delete pv/paprika-storage-pv --timeout=30s 2>/dev/null || echo "paprika-storage-pv already deleted"
-                                        kubectl wait --for=delete pv/paprika-cache-pv --timeout=30s 2>/dev/null || echo "paprika-cache-pv already deleted"
 
                                         # 驗證 YAML 文件語法
                                         echo "=== Validating YAML files syntax ==="
@@ -569,22 +464,6 @@ EOF
                                             echo "❌ deployment.yaml syntax is invalid"
                                             exit 1
                                         fi
-
-                                        # 檢查 PVC 狀態
-                                        echo "=== Checking PVC status ==="
-                                        kubectl get pvc paprika-storage paprika-cache
-
-                                        # 檢查 PV 狀態
-                                        echo "=== Checking PV status ==="
-                                        kubectl get pv paprika-storage-pv paprika-cache-pv
-                                        echo "=== PV details ==="
-                                        kubectl describe pv paprika-storage-pv paprika-cache-pv
-
-                                        # 等待 PVC 綁定
-                                        echo "=== Waiting for PVCs to be bound ==="
-                                        kubectl wait --for=condition=Bound pvc/paprika-storage --timeout=60s
-                                        kubectl wait --for=condition=Bound pvc/paprika-cache --timeout=60s
-                                        echo "✅ PVCs are bound successfully"
 
                                         # 等待 Pod 就緒
                                         echo "=== Waiting for Pod to be Ready ==="
