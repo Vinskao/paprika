@@ -365,14 +365,14 @@ kind: Ingress
 metadata:
   name: paprika-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /\\\$2
+    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
   - host: peoplesystem.tatdvsonorth.com
     http:
       paths:
-      - path: /paprika(/|\\\$)(.*)
+      - path: /paprika(/|$)(.*)
         pathType: Prefix
         backend:
           service:
