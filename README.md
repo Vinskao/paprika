@@ -106,7 +106,7 @@ php artisan serve
 
 ## Database Setup
 
-1. Create the articles table and indexes:
+1. Create the articles table:
 
 ```sql
 -- Create articles table
@@ -118,33 +118,11 @@ CREATE TABLE articles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Create indexes
-CREATE UNIQUE INDEX idx_articles_file_path ON articles(file_path);
-CREATE INDEX idx_articles_file_date ON articles(file_date);
 ```
 
-2. Create the trigger function:
-
-```sql
--- Create trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-```
-
-3. Create the trigger:
-
-```sql
--- Create trigger
-CREATE TRIGGER update_articles_updated_at 
-    BEFORE UPDATE ON articles 
-    FOR EACH ROW 
-    EXECUTE FUNCTION update_updated_at_column();
+2. Run database migrations:
+```bash
+php artisan migrate:fresh
 ```
 
 ## Useful Commands
