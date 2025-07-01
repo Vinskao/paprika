@@ -14,6 +14,7 @@ class Article extends Model
         'file_path',
         'content',
         'file_date',
+        'embedding',
     ];
 
     protected $casts = [

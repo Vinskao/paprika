@@ -13,7 +13,7 @@ class ArticleController extends Controller
 {
     public function index()
     {
-        $articles = Article::select(['id', 'file_path', 'content', 'file_date', 'created_at', 'updated_at'])
+        $articles = Article::select(['id', 'file_path', 'content', 'file_date', 'created_at', 'updated_at', 'embedding'])
             ->orderBy('file_date', 'desc')
             ->get();
 
