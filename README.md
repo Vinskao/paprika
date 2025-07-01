@@ -116,7 +116,8 @@ CREATE TABLE articles (
     content TEXT NOT NULL,
     file_date TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    embedding vector(1536)
 );
 ```
 
