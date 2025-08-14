@@ -78,7 +78,7 @@ APP_NAME=Paprika
 APP_ENV=${LARAVEL_APP_ENV:-production}
 APP_KEY=${LARAVEL_APP_KEY:-$APP_KEY_VALUE}
 APP_DEBUG=${LARAVEL_APP_DEBUG:-false}
-APP_URL=${LARAVEL_APP_URL:-http://localhost:8000}
+APP_URL=${APP_URL:-http://localhost:8000}
 
 LOG_CHANNEL=stack
 LOG_LEVEL=${LARAVEL_LOG_LEVEL:-debug}
@@ -179,7 +179,7 @@ echo "🔍 Verifying route configuration..."
 php artisan route:list --compact
 
 echo "✅ Laravel application is ready!"
-echo "🌐 Application URL: ${LARAVEL_APP_URL:-http://localhost:8000}"
+echo "🌐 Application URL: ${APP_URL:-http://localhost:8000}"
 
 # 啟動服務
 php-fpm -D

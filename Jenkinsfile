@@ -138,7 +138,7 @@ pipeline {
                     script {
                         withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                             sh '''
-                                cd /home/jenkins/agent/workspace/PAPRIKA/paprika-deploy
+                                cd "${WORKSPACE}"
                                 echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
                                 # 確認 Dockerfile 存在
                                 ls -la
@@ -173,8 +173,7 @@ pipeline {
                                     string(credentialsId: 'DB_PORT', variable: 'DB_PORT'),
                                     string(credentialsId: 'DB_DATABASE', variable: 'DB_DATABASE'),
                                     string(credentialsId: 'DB_USERNAME', variable: 'DB_USERNAME'),
-                                    string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD'),
-                                    string(credentialsId: 'APP_URL', variable: 'APP_URL')
+                                    string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD')
                                 ]) {
                                     // 創建 k8s 目錄並設置權限
                                     sh '''
@@ -188,7 +187,7 @@ pipeline {
                                         echo "DB_DATABASE: ${DB_DATABASE}"
                                         echo "DB_USERNAME: ${DB_USERNAME}"
                                         echo "DB_PASSWORD: [MASKED]"
-                                        echo "APP_URL: ${APP_URL}"
+                                        echo "APP_URL: https://peoplesystem.tatdvsonorth.com/paprika"
 
                                         # 驗證 DB_PORT 是否為有效整數
                                         echo "=== Validating DB_PORT ==="
@@ -224,7 +223,7 @@ stringData:
   DATABASE_NAME: "${DB_DATABASE}"
   DATABASE_USER: "${DB_USERNAME}"
   DATABASE_PASSWORD: "${DB_PASSWORD}"
-  APP_URL: "${APP_URL}"
+  # APP_URL removed from Secret; set directly in Deployment env
   DATABASE_CONNECTION: "pgsql"
   APP_KEY: "base64:${appKey}"
 EOF
@@ -310,11 +309,8 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: APP_KEY
-        - name: LARAVEL_APP_URL
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: APP_URL
+        - name: APP_URL
+          value: "https://peoplesystem.tatdvsonorth.com/paprika"
         - name: LARAVEL_DATABASE_CONNECTION
           value: "pgsql"
         - name: LARAVEL_CACHE_DRIVER
