@@ -31,7 +31,7 @@ docker run -d \
   -p 8000:8000 \
   -e LARAVEL_APP_ENV=production \
   -e LARAVEL_APP_DEBUG=true \
-  -e LARAVEL_APP_URL=http://localhost:8000 \
+  -e APP_URL=http://localhost:8000 \
   -e LARAVEL_DATABASE_CONNECTION=pgsql \
   -e LARAVEL_DATABASE_HOST=? \
   -e LARAVEL_DATABASE_PORT_NUMBER=? \
@@ -58,7 +58,7 @@ docker logs paprika-dev
 curl http://localhost:8000/up
 
 # Test the API endpoint
-curl http://localhost:8000/api/articles
+curl http://localhost:8000/paprika/articles
 
 # Access the container shell
 docker exec -it paprika-dev /bin/sh
@@ -70,7 +70,7 @@ docker exec -it paprika-dev /bin/sh
 |----------|-------------|---------|---------|
 | `LARAVEL_APP_ENV` | Application environment | `production` | `local` |
 | `LARAVEL_APP_DEBUG` | Enable debug mode | `false` | `true` |
-| `LARAVEL_APP_URL` | Application URL | `http://localhost:8000` | `http://localhost:8000` |
+| `APP_URL` | Application URL | `http://localhost:8000` | `http://localhost:8000` |
 | `LARAVEL_DATABASE_CONNECTION` | Database connection type | `pgsql` | `pgsql` |
 | `LARAVEL_DATABASE_HOST` | Database host | `localhost` | `peoplesystem.tatdvsonorth.com` |
 | `LARAVEL_DATABASE_PORT_NUMBER` | Database port | `5432` | `30000` |
@@ -101,7 +101,7 @@ php artisan migrate:fresh
 
 3. Start the Laravel development server:
 ```bash
-php artisan serve
+php artisan serve --port=8000
 ```
 
 ## Database Setup
