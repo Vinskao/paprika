@@ -220,7 +220,7 @@ pipeline {
                                         echo "DB_PORT validation passed: ${DB_PORT}"
 
                                         # 確保 DB_PORT 是整數並去除可能的空格
-                                        DB_PORT_CLEAN="${DB_PORT// /}"
+                                        DB_PORT_CLEAN=$(echo "${DB_PORT}" | tr -d ' ')
                                         if ! [[ "$DB_PORT_CLEAN" =~ ^[0-9]+$ ]]; then
                                             echo "ERROR: DB_PORT '${DB_PORT}' is not a valid integer after trimming!"
                                             exit 1
