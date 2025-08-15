@@ -22,53 +22,53 @@ spec:
         ports:
         - containerPort: 8000
         env:
-        - name: LARAVEL_APP_ENV
+        - name: APP_ENV
           value: "production"
-        - name: LARAVEL_APP_DEBUG
+        - name: APP_DEBUG
           value: "false"
-        - name: LARAVEL_LOG_LEVEL
+        - name: LOG_LEVEL
           value: "info"
-        - name: LARAVEL_DATABASE_HOST
+        - name: DB_CONNECTION
+          value: "pgsql"
+        - name: DB_HOST
           valueFrom:
             secretKeyRef:
-              name: paprika-secrets
+              name: paprika-secret
               key: DATABASE_HOST
-        - name: LARAVEL_DATABASE_PORT_NUMBER
+        - name: DB_PORT
           valueFrom:
             secretKeyRef:
-              name: paprika-secrets
+              name: paprika-secret
               key: DATABASE_PORT_NUMBER
-        - name: LARAVEL_DATABASE_NAME
+        - name: DB_DATABASE
           valueFrom:
             secretKeyRef:
-              name: paprika-secrets
+              name: paprika-secret
               key: DATABASE_NAME
-        - name: LARAVEL_DATABASE_USER
+        - name: DB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: paprika-secrets
-              key: DATABASE_USER
-        - name: LARAVEL_DATABASE_PASSWORD
+              name: paprika-secret
+              key: DATABASE_USERNAME
+        - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: paprika-secrets
+              name: paprika-secret
               key: DATABASE_PASSWORD
-        - name: LARAVEL_APP_KEY
+        - name: APP_KEY
           valueFrom:
             secretKeyRef:
-              name: paprika-secrets
+              name: paprika-secret
               key: APP_KEY
         - name: APP_URL
           value: "http://peoplesystem.tatdvsonorth.com/paprika"
-        - name: LARAVEL_DATABASE_CONNECTION
-          value: "pgsql"
-        - name: LARAVEL_CACHE_DRIVER
+        - name: CACHE_DRIVER
           value: "array"
-        - name: LARAVEL_SESSION_DRIVER
+        - name: SESSION_DRIVER
           value: "array"
-        - name: LARAVEL_SESSION_LIFETIME
+        - name: SESSION_LIFETIME
           value: "120"
-        - name: LARAVEL_FILESYSTEM_DISK
+        - name: FILESYSTEM_DISK
           value: "local"
         - name: VIEW_COMPILED_PATH
           value: "/tmp/views"

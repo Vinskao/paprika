@@ -162,7 +162,120 @@ pipeline {
             }
         }
 
-        // Deployment to Kubernetes stage removed per request
+        stage('Debug Environment') {
+            steps {
+                container('kubectl') {
+                    script {
+                        echo "=== Listing all environment variables ==="
+                        sh 'printenv | sort'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    withCredentials([
+                        string(credentialsId: 'DB_HOST', variable: 'DB_HOST'),
+                        string(credentialsId: 'DB_PORT', variable: 'DB_PORT'),
+                        string(credentialsId: 'DB_DATABASE', variable: 'DB_DATABASE'),
+                        string(credentialsId: 'DB_USERNAME', variable: 'DB_USERNAME'),
+                        string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD')
+                    ]) {
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                            script {
+                                try {
+                                    sh '''
+                                        set -e
+
+                                        # Ensure envsubst is available (try Debian then Alpine)
+                                        if ! command -v envsubst >/dev/null 2>&1; then
+                                          (apt-get update && apt-get install -y --no-install-recommends gettext-base ca-certificates) >/dev/null 2>&1 || true
+                                          command -v envsubst >/dev/null 2>&1 || (apk add --no-cache gettext ca-certificates >/dev/null 2>&1 || true)
+                                        fi
+
+                                        # In-cluster auth via ServiceAccount (serviceAccountName: jenkins-admin)
+                                        kubectl cluster-info
+
+                                        # Ensure Docker Hub imagePullSecret exists in default namespace
+                                        kubectl create secret docker-registry dockerhub-credentials \
+                                          --docker-server=https://index.docker.io/v1/ \
+                                          --docker-username="${DOCKER_USERNAME}" \
+                                          --docker-password="${DOCKER_PASSWORD}" \
+                                          --docker-email="none" \
+                                          -n default \
+                                          --dry-run=client -o yaml | kubectl apply -f -
+
+                                        # Generate APP_KEY
+                                        APP_KEY="base64:$(openssl rand -base64 32)"
+
+                                        # Clean DB_PORT (remove spaces)
+                                        DB_PORT_CLEAN=$(echo "${DB_PORT}" | tr -d ' ')
+
+                                        # Create secret.yaml
+                                        cat > k8s/secret.yaml << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paprika-secret
+type: Opaque
+data:
+  DATABASE_CONNECTION: cGdzcWw=
+  DATABASE_HOST: $(echo -n "${DB_HOST}" | base64)
+  DATABASE_PORT_NUMBER: $(echo -n "${DB_PORT_CLEAN}" | base64)
+  DATABASE_NAME: $(echo -n "${DB_DATABASE}" | base64)
+  DATABASE_USERNAME: $(echo -n "${DB_USERNAME}" | base64)
+  DATABASE_PASSWORD: $(echo -n "${DB_PASSWORD}" | base64)
+  APP_KEY: $(echo -n "${APP_KEY}" | base64)
+EOF
+
+                                        # Inspect manifest directory
+                                        ls -la k8s/
+
+                                        echo "Recreating deployment ..."
+                                        echo "=== Effective sensitive env values ==="
+                                        echo "DB_HOST=${DB_HOST}"
+                                        echo "DB_PORT=${DB_PORT_CLEAN}"
+                                        echo "DB_DATABASE=${DB_DATABASE}"
+
+                                        kubectl delete deployment paprika -n default --ignore-not-found
+                                        kubectl apply -f k8s/secret.yaml
+                                        DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_TAG=${DOCKER_TAG} envsubst '${DOCKER_IMAGE} ${DOCKER_TAG}' < k8s/deployment.yaml | kubectl apply -f -
+                                        kubectl set image deployment/paprika paprika=${DOCKER_IMAGE}:${DOCKER_TAG} -n default
+                                        kubectl rollout status deployment/paprika -n default
+                                    '''
+
+                                    // 檢查部署狀態
+                                    sh 'kubectl get deployments -n default'
+                                    sh 'kubectl rollout status deployment/paprika -n default'
+                                } catch (Exception e) {
+                                    echo "Error during deployment: ${e.message}"
+                                    // Debug non-ready pods and recent events
+                                    sh '''
+                                        set +e
+                                        echo "=== Debug: pods for paprika ==="
+                                        kubectl get pods -n default -l app=paprika -o wide || true
+
+                                        echo "=== Debug: describe non-ready pods ==="
+                                        for p in $(kubectl get pods -n default -l app=paprika -o jsonpath='{.items[?(@.status.conditions[?(@.type=="Ready")].status!="True")].metadata.name}'); do
+                                          echo "--- $p"
+                                          kubectl describe pod -n default "$p" || true
+                                          echo "=== Last 200 logs for $p ==="
+                                          kubectl logs -n default "$p" --tail=200 || true
+                                        done
+
+                                        echo "=== Recent events (default ns) ==="
+                                        kubectl get events -n default --sort-by=.lastTimestamp | tail -n 100 || true
+                                    '''
+                                    throw e
+                                }
+                            } // end script
+                        } // end inner withCredentials
+                    } // end outer withCredentials
+                } // end container
+            } // end steps
+        } // end stage
     }
     post {
         always {
