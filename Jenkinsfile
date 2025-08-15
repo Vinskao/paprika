@@ -172,8 +172,7 @@ pipeline {
                                 string(credentialsId: 'DB_PORT', variable: 'DB_PORT'),
                                 string(credentialsId: 'DB_DATABASE', variable: 'DB_DATABASE'),
                                 string(credentialsId: 'DB_USERNAME', variable: 'DB_USERNAME'),
-                                string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD'),
-                                string(credentialsId: 'APP_URL', variable: 'APP_URL')
+                                string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD')
                             ]) {
                                 withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                                     sh '''
@@ -207,7 +206,7 @@ pipeline {
                                         echo "DB_DATABASE: ${DB_DATABASE}"
                                         echo "DB_USERNAME: ${DB_USERNAME}"
                                         echo "DB_PASSWORD: [MASKED]"
-                                        echo "APP_URL: https://peoplesystem.tatdvsonorth.com/paprika"
+                                        echo "APP_URL: http://peoplesystem.tatdvsonorth.com/paprika"
 
                                         # 驗證 DB_PORT 是否為有效整數
                                         echo "=== Validating DB_PORT ==="
@@ -326,8 +325,8 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: APP_KEY
-        - name: APP_URL
-          value: "https://peoplesystem.tatdvsonorth.com/paprika"
+                 - name: APP_URL
+           value: "http://peoplesystem.tatdvsonorth.com/paprika"
         - name: LARAVEL_DATABASE_CONNECTION
           value: "pgsql"
         - name: LARAVEL_CACHE_DRIVER
