@@ -325,8 +325,8 @@ spec:
             secretKeyRef:
               name: paprika-secrets
               key: APP_KEY
-                 - name: APP_URL
-           value: "http://peoplesystem.tatdvsonorth.com/paprika"
+        - name: APP_URL
+          value: "http://peoplesystem.tatdvsonorth.com/paprika"
         - name: LARAVEL_DATABASE_CONNECTION
           value: "pgsql"
         - name: LARAVEL_CACHE_DRIVER
