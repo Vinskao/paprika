@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paprika
+  labels:
+    app: paprika
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paprika
+  template:
+    metadata:
+      labels:
+        app: paprika
+    spec:
+      imagePullSecrets:
+      - name: dockerhub-credentials
+      containers:
+      - name: paprika
+        image: ${DOCKER_IMAGE}:${DOCKER_TAG}
+        ports:
+        - containerPort: 8000
+        env:
+        - name: LARAVEL_APP_ENV
+          value: "production"
+        - name: LARAVEL_APP_DEBUG
+          value: "false"
+        - name: LARAVEL_LOG_LEVEL
+          value: "info"
+        - name: LARAVEL_DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: DATABASE_HOST
+        - name: LARAVEL_DATABASE_PORT_NUMBER
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: DATABASE_PORT_NUMBER
+        - name: LARAVEL_DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: DATABASE_NAME
+        - name: LARAVEL_DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: DATABASE_USER
+        - name: LARAVEL_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: DATABASE_PASSWORD
+        - name: LARAVEL_APP_KEY
+          valueFrom:
+            secretKeyRef:
+              name: paprika-secrets
+              key: APP_KEY
+        - name: APP_URL
+          value: "http://peoplesystem.tatdvsonorth.com/paprika"
+        - name: LARAVEL_DATABASE_CONNECTION
+          value: "pgsql"
+        - name: LARAVEL_CACHE_DRIVER
+          value: "array"
+        - name: LARAVEL_SESSION_DRIVER
+          value: "array"
+        - name: LARAVEL_SESSION_LIFETIME
+          value: "120"
+        - name: LARAVEL_FILESYSTEM_DISK
+          value: "local"
+        - name: VIEW_COMPILED_PATH
+          value: "/tmp/views"
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                echo "🔍 檢查應用目錄結構..."
+                ls -la /app/
+                echo "📁 創建臨時目錄..."
+                mkdir -p /tmp/views /tmp/cache /tmp/sessions /tmp/logs
+                chmod -R 777 /tmp/views /tmp/cache /tmp/sessions /tmp/logs
+                echo "✅ PostStart: 臨時目錄創建完成"
+                echo "🔍 最終目錄檢查："
+                ls -al /tmp/
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paprika
+  labels:
+    app: paprika
+spec:
+  selector:
+    app: paprika
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paprika-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /paprika/$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: peoplesystem.tatdvsonorth.com
+    http:
+      paths:
+      - path: /paprika(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: paprika
+            port:
+              number: 80
+
+
