@@ -21,6 +21,13 @@ spec:
         image: ${DOCKER_IMAGE}:${DOCKER_TAG}
         ports:
         - containerPort: 8000
+        resources:
+          requests:
+            cpu: "25m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
         env:
         - name: APP_ENV
           value: "production"
