@@ -115,6 +115,7 @@ kind: Ingress
 metadata:
   name: paprika-ingress
   annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /paprika/$2
 spec:
   ingressClassName: nginx
@@ -123,7 +124,7 @@ spec:
     http:
       paths:
       - path: /paprika(/|$)(.*)
-        pathType: Prefix
+        pathType: ImplementationSpecific
         backend:
           service:
             name: paprika
