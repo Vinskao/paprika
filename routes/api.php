@@ -3,6 +3,15 @@
 use App\Http\Controllers\Api\ArticleController;
 use Illuminate\Support\Facades\Route;
 
+// 健康檢查路由
+Route::get('/up', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now()->toISOString(),
+        'version' => '1.0.0'
+    ]);
+});
+
 // 所有路由都不需要認證
 Route::get('/articles', [ArticleController::class, 'index']);
 Route::get('/articles/{article}', [ArticleController::class, 'show']);

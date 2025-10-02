@@ -323,6 +323,13 @@ spec:
           value: "local"
         - name: VIEW_COMPILED_PATH
           value: "/tmp/views"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 64Mi
+          limits:
+            cpu: 10m
+            memory: 128Mi
         lifecycle:
           postStart:
             exec:
