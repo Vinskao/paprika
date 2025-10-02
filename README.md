@@ -106,22 +106,27 @@ php artisan serve --port=8000
 
 ## Database Setup
 
-1. Create the articles table:
+### Option 1: Direct SQL Creation
 
 ```sql
--- Create articles table
+DROP TABLE IF EXISTS articles;
+
 CREATE TABLE articles (
-    id SERIAL PRIMARY KEY,
-    file_path VARCHAR(500) NOT NULL,
-    content TEXT NOT NULL,
-    file_date TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    embedding vector(1536)
+  id BIGSERIAL PRIMARY KEY,
+  file_path VARCHAR(500) UNIQUE NOT NULL,
+  content TEXT NOT NULL,
+  file_date TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL,
+  deleted_at TIMESTAMP NULL,
+  embedding vector(1536)
 );
+
+-- 索引
+CREATE INDEX articles_file_date_index ON articles (file_date);
 ```
 
-2. Run database migrations:
+### Option 2: Using Laravel Migrations
 ```bash
 php artisan migrate:fresh
 ```

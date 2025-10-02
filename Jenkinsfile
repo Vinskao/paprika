@@ -6,6 +6,8 @@ pipeline {
                 kind: Pod
                 spec:
                   serviceAccountName: jenkins-admin
+                  imagePullSecrets:
+                  - name: dockerhub-credentials
                   containers:
                   - name: php
                     image: php:8.2-cli
@@ -21,8 +23,6 @@ pipeline {
                     securityContext:
                       privileged: true
                     env:
-                    - name: DOCKER_HOST
-                      value: tcp://localhost:2375
                     - name: DOCKER_TLS_CERTDIR
                       value: ""
                     - name: DOCKER_BUILDKIT
@@ -34,7 +34,7 @@ pipeline {
                     image: bitnami/kubectl:1.30.7
                     command: ["/bin/sh"]
                     args: ["-c", "while true; do sleep 30; done"]
-                    alwaysPull: true
+                    imagePullPolicy: Always
                     securityContext:
                       runAsUser: 0
                     volumeMounts:
@@ -162,393 +162,128 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Debug Environment') {
             steps {
                 container('kubectl') {
-                    withKubeConfig([credentialsId: 'kubeconfig-secret']) {
-                        script {
-                            try {
-                                withCredentials([
-                                    string(credentialsId: 'DB_HOST', variable: 'DB_HOST'),
-                                    string(credentialsId: 'DB_PORT', variable: 'DB_PORT'),
-                                    string(credentialsId: 'DB_DATABASE', variable: 'DB_DATABASE'),
-                                    string(credentialsId: 'DB_USERNAME', variable: 'DB_USERNAME'),
-                                    string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD')
-                                ]) {
-                                    // 創建 k8s 目錄並設置權限
-                                    sh '''
-                                        # 創建 k8s 目錄用於 Kubernetes 配置
-                                        mkdir -p k8s
-                                        chmod 755 k8s
-
-                                        echo "=== Checking Environment Variables ==="
-                                        echo "DB_HOST: ${DB_HOST}"
-                                        echo "DB_PORT: ${DB_PORT}"
-                                        echo "DB_DATABASE: ${DB_DATABASE}"
-                                        echo "DB_USERNAME: ${DB_USERNAME}"
-                                        echo "DB_PASSWORD: [MASKED]"
-                                        echo "APP_URL: https://peoplesystem.tatdvsonorth.com/paprika"
-
-                                        # 驗證 DB_PORT 是否為有效整數
-                                        echo "=== Validating DB_PORT ==="
-                                        if ! echo "${DB_PORT}" | grep -E "^[0-9]+$" > /dev/null; then
-                                            echo "ERROR: DB_PORT '${DB_PORT}' is not a valid integer!"
-                                            echo "DB_PORT length: ${#DB_PORT}"
-                                            echo "DB_PORT hex dump:"
-                                            echo "${DB_PORT}" | hexdump -C
-                                            exit 1
-                                        fi
-                                        echo "DB_PORT validation passed: ${DB_PORT}"
-                                    '''
-
-                                    // 確保 DB_PORT 是整數並去除可能的空格
-                                    def dbPortClean = DB_PORT.trim()
-                                    if (!dbPortClean.isInteger()) {
-                                        error "ERROR: DB_PORT '${DB_PORT}' is not a valid integer after trimming!"
-                                    }
-
-                                    // 生成 Secret（移除 LARAVEL_ 前綴）
-                                    def appKey = sh(script: 'openssl rand -base64 32', returnStdout: true).trim()
-
-                                    sh """
-                                        cat > k8s/secret.yaml << 'EOF'
-apiVersion: v1
-kind: Secret
-metadata:
-  name: paprika-secrets
-type: Opaque
-stringData:
-  DATABASE_HOST: "${DB_HOST}"
-  DATABASE_PORT_NUMBER: "${dbPortClean}"
-  DATABASE_NAME: "${DB_DATABASE}"
-  DATABASE_USER: "${DB_USERNAME}"
-  DATABASE_PASSWORD: "${DB_PASSWORD}"
-  # APP_URL removed from Secret; set directly in Deployment env
-  DATABASE_CONNECTION: "pgsql"
-  APP_KEY: "base64:${appKey}"
-EOF
-                                    """
-
-                                    // 調試：檢查 secret.yaml 文件
-                                    sh '''
-                                        echo "=== Debug: Checking secret.yaml file ==="
-                                        echo "Current directory: $(pwd)"
-                                        echo "k8s directory contents:"
-                                        ls -la k8s/
-
-                                        if [ -f "k8s/secret.yaml" ]; then
-                                            echo "✅ secret.yaml file exists"
-                                            echo "File size: $(wc -c < k8s/secret.yaml) bytes"
-                                            echo "File permissions: $(ls -la k8s/secret.yaml)"
-                                            echo "First 10 lines of secret.yaml:"
-                                            head -10 k8s/secret.yaml
-                                        else
-                                            echo "❌ secret.yaml file does not exist!"
-                                            exit 1
-                                        fi
-                                    '''
-
-                                    // 生成 Deployment（使用 envsubst 進行變數替換）
-                                    sh """
-                                        cat > k8s/deployment.yaml << 'EOF'
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: paprika
-  labels:
-    app: paprika
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: paprika
-  template:
-    metadata:
-      labels:
-        app: paprika
-    spec:
-      containers:
-      - name: paprika
-        image: \${DOCKER_IMAGE}:\${DOCKER_TAG}
-        ports:
-        - containerPort: 8000
-        env:
-        - name: LARAVEL_APP_ENV
-          value: "production"
-        - name: LARAVEL_APP_DEBUG
-          value: "false"
-        - name: LARAVEL_LOG_LEVEL
-          value: "info"
-        - name: LARAVEL_DATABASE_HOST
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: DATABASE_HOST
-        - name: LARAVEL_DATABASE_PORT_NUMBER
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: DATABASE_PORT_NUMBER
-        - name: LARAVEL_DATABASE_NAME
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: DATABASE_NAME
-        - name: LARAVEL_DATABASE_USER
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: DATABASE_USER
-        - name: LARAVEL_DATABASE_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: DATABASE_PASSWORD
-        - name: LARAVEL_APP_KEY
-          valueFrom:
-            secretKeyRef:
-              name: paprika-secrets
-              key: APP_KEY
-        - name: APP_URL
-          value: "https://peoplesystem.tatdvsonorth.com/paprika"
-        - name: LARAVEL_DATABASE_CONNECTION
-          value: "pgsql"
-        - name: LARAVEL_CACHE_DRIVER
-          value: "array"
-        - name: LARAVEL_SESSION_DRIVER
-          value: "array"
-        - name: LARAVEL_SESSION_LIFETIME
-          value: "120"
-        - name: LARAVEL_FILESYSTEM_DISK
-          value: "local"
-        - name: VIEW_COMPILED_PATH
-          value: "/tmp/views"
-        resources:
-          requests:
-            cpu: 10m
-            memory: 64Mi
-          limits:
-            cpu: 10m
-            memory: 128Mi
-        lifecycle:
-          postStart:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - |
-                  echo "🔍 檢查應用目錄結構..."
-                  ls -la /app/
-
-                  echo "📁 創建臨時目錄..."
-                  mkdir -p /tmp/views /tmp/cache /tmp/sessions /tmp/logs
-                  chmod -R 777 /tmp/views /tmp/cache /tmp/sessions /tmp/logs
-                  echo "✅ PostStart: 臨時目錄創建完成"
-
-                  echo "🔍 最終目錄檢查："
-                  ls -al /tmp/
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: paprika
-  labels:
-    app: paprika
-spec:
-  selector:
-    app: paprika
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8000
-  type: ClusterIP
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: paprika-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /paprika/\$2
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: peoplesystem.tatdvsonorth.com
-    http:
-      paths:
-      - path: /paprika(/|\$)(.*)
-        pathType: Prefix
-        backend:
-          service:
-            name: paprika
-            port:
-              number: 80
-EOF
-                                    """
-
-                                    // 調試：檢查 deployment.yaml 文件
-                                    sh '''
-                                        echo "=== Debug: Checking deployment.yaml file ==="
-                                        if [ -f "k8s/deployment.yaml" ]; then
-                                            echo "✅ deployment.yaml file exists"
-                                            echo "File size: $(wc -c < k8s/deployment.yaml) bytes"
-                                            echo "File permissions: $(ls -la k8s/deployment.yaml)"
-                                            echo "First 10 lines of deployment.yaml:"
-                                            head -10 k8s/deployment.yaml
-
-                                            echo "=== Checking Docker image variable replacement ==="
-                                            if grep -q "\${DOCKER_IMAGE}:\${DOCKER_TAG}" k8s/deployment.yaml; then
-                                                echo "✅ Docker image variables found in deployment.yaml (before envsubst)"
-                                                echo "DOCKER_IMAGE: ${DOCKER_IMAGE}"
-                                                echo "DOCKER_TAG: ${DOCKER_TAG}"
-                                                echo "Full image name: ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                                            else
-                                                echo "❌ Docker image variables NOT found in deployment.yaml"
-                                                echo "Checking for literal variable names..."
-                                                grep -n "DOCKER_IMAGE\\|DOCKER_TAG" k8s/deployment.yaml || echo "No variable references found"
-                                            fi
-                                        else
-                                            echo "❌ deployment.yaml file does not exist!"
-                                            exit 1
-                                        fi
-
-                                        echo "=== Debug: Final k8s directory check ==="
-                                        echo "k8s directory contents:"
-                                        ls -la k8s/
-                                        echo "Total files in k8s directory: $(ls k8s/ | wc -l)"
-                                    '''
-
-                                    // 調試：檢查 envsubst 輸出
-                                    echo "=== Debug: Checking envsubst output ==="
-                                    echo "DOCKER_IMAGE: ${DOCKER_IMAGE}"
-                                    echo "DOCKER_TAG: ${DOCKER_TAG}"
-                                    echo "Full image name: ${DOCKER_IMAGE}:${DOCKER_TAG}"
-
-                                    // 預覽替換後的內容
-                                    sh '''
-                                        echo "=== Preview of processed deployment.yaml ==="
-                                        envsubst < k8s/deployment.yaml | grep -A 5 -B 5 "image:" || echo "No image line found"
-                                    '''
-
-                                    // 應用 Secret
-                                    sh '''
-                                        echo "=== Applying Kubernetes Secret ==="
-                                        kubectl apply -f k8s/secret.yaml
-                                    '''
-
-                                    // 應用 Deployment（包含新的 PVC）
-                                    sh '''
-                                        echo "=== Applying Kubernetes Deployment ==="
-                                        envsubst < k8s/deployment.yaml | kubectl apply -f -
-                                    '''
-
-                                    // 應用 Kubernetes 配置
-                                    sh '''
-                                        # 強制刪除現有的 Pod（確保重新部署）
-                                        echo "=== Force deleting existing Pods to ensure fresh deployment ==="
-                                        kubectl delete pod -l app=paprika --force --grace-period=0 --ignore-not-found
-                                        echo "✅ Existing Pods force deleted (if they existed)"
-
-                                        # 等待 Pod 完全刪除
-                                        echo "=== Waiting for Pods to be fully deleted ==="
-                                        kubectl wait --for=delete pod -l app=paprika --timeout=30s 2>/dev/null || echo "Pods already deleted"
-
-                                        # 驗證 YAML 文件語法
-                                        echo "=== Validating YAML files syntax ==="
-                                        if kubectl apply --dry-run=client -f k8s/secret.yaml; then
-                                            echo "✅ secret.yaml syntax is valid"
-                                        else
-                                            echo "❌ secret.yaml syntax is invalid"
-                                            exit 1
-                                        fi
-
-                                        if kubectl apply --dry-run=client -f k8s/deployment.yaml; then
-                                            echo "✅ deployment.yaml syntax is valid"
-                                        else
-                                            echo "❌ deployment.yaml syntax is invalid"
-                                            exit 1
-                                        fi
-
-                                        # 等待 Pod 就緒
-                                        echo "=== Waiting for Pod to be Ready ==="
-                                        kubectl wait --for=condition=Ready pod -l app=paprika --timeout=180s
-
-                                        # 檢查 Pod 狀態
-                                        echo "=== Checking Pod Status ==="
-                                        kubectl get pods -l app=paprika
-
-                                        # 檢查 Pod 詳細狀態
-                                        echo "=== Checking Pod Details ==="
-                                        POD_NAME=$(kubectl get pods -l app=paprika -o jsonpath="{.items[0].metadata.name}")
-                                        kubectl describe pod $POD_NAME
-
-                                        # 等待應用完全啟動
-                                        echo "=== Waiting for Laravel Application to be Ready ==="
-                                        for i in {1..30}; do
-                                            echo "Attempt $i/30: Checking Laravel application..."
-
-                                            # 首先檢查服務是否響應
-                                            if kubectl exec $POD_NAME -c paprika -- curl -f http://localhost:8000 >/dev/null 2>&1; then
-                                                echo "✅ Laravel application is responding"
-
-                                                # 然後檢查 /up 端點
-                                                if kubectl exec $POD_NAME -c paprika -- curl -f http://localhost:8000/up >/dev/null 2>&1; then
-                                                    echo "✅ Laravel /up endpoint is working!"
-                                                    break
-                                                else
-                                                    echo "⚠️  /up endpoint returned error, trying /health endpoint..."
-                                                    if kubectl exec $POD_NAME -c paprika -- curl -f http://localhost:8000/health >/dev/null 2>&1; then
-                                                        echo "✅ Laravel /health endpoint is working!"
-                                                        break
-                                                    else
-                                                        echo "⚠️  Both /up and /health endpoints failed, but application is running"
-                                                        echo "=== Testing /up endpoint with verbose output ==="
-                                                        kubectl exec $POD_NAME -c paprika -- curl -v http://localhost:8000/up
-                                                        echo "=== Testing /health endpoint with verbose output ==="
-                                                        kubectl exec $POD_NAME -c paprika -- curl -v http://localhost:8000/health
-                                                        echo "=== Application is ready (ignoring endpoint errors) ==="
-                                                        break
-                                                    fi
-                                                fi
-                                            fi
-
-                                            if [ $i -eq 30 ]; then
-                                                echo "❌ Laravel application failed to become ready after 30 attempts"
-                                                echo "=== Checking Laravel logs ==="
-                                                kubectl logs $POD_NAME -c paprika --tail=50
-                                                echo "=== Testing application directly ==="
-                                                kubectl exec $POD_NAME -c paprika -- curl -v http://localhost:8000
-                                                exit 1
-                                            fi
-                                            echo "Application not ready yet, waiting 2 seconds..."
-                                            sleep 2
-                                        done
-
-                                        # 檢查 Pod 日誌
-                                        echo "=== Checking Pod Logs ==="
-                                        kubectl logs $POD_NAME
-
-                                        # 檢查環境變數是否正確設置
-                                        echo "=== Checking Pod Environment Variables ==="
-                                        kubectl exec $POD_NAME -c paprika -- env | grep -E "(APP_|DATABASE_|CACHE_|SESSION_)"
-
-                                        # 檢查 Secret 是否正確創建
-                                        echo "=== Checking Kubernetes Secret ==="
-                                        kubectl get secret paprika-secrets -o yaml
-                                    '''
-                                }
-                            } catch (Exception e) {
-                                echo "Error during deployment: ${e.message}"
-                                throw e
-                            }
-                        }
+                    script {
+                        echo "=== Listing all environment variables ==="
+                        sh 'printenv | sort'
                     }
                 }
             }
         }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                container('kubectl') {
+                    withCredentials([
+                        string(credentialsId: 'DB_HOST', variable: 'DB_HOST'),
+                        string(credentialsId: 'DB_PORT', variable: 'DB_PORT'),
+                        string(credentialsId: 'DB_DATABASE', variable: 'DB_DATABASE'),
+                        string(credentialsId: 'DB_USERNAME', variable: 'DB_USERNAME'),
+                        string(credentialsId: 'DB_PASSWORD', variable: 'DB_PASSWORD')
+                    ]) {
+                        withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                            script {
+                                try {
+                                    sh '''
+                                        set -e
+
+                                        # Ensure envsubst is available (try Debian then Alpine)
+                                        if ! command -v envsubst >/dev/null 2>&1; then
+                                          (apt-get update && apt-get install -y --no-install-recommends gettext-base ca-certificates) >/dev/null 2>&1 || true
+                                          command -v envsubst >/dev/null 2>&1 || (apk add --no-cache gettext ca-certificates >/dev/null 2>&1 || true)
+                                        fi
+
+                                        # In-cluster auth via ServiceAccount (serviceAccountName: jenkins-admin)
+                                        kubectl cluster-info
+
+                                        # Ensure Docker Hub imagePullSecret exists in default namespace
+                                        kubectl create secret docker-registry dockerhub-credentials \
+                                          --docker-server=https://index.docker.io/v1/ \
+                                          --docker-username="${DOCKER_USERNAME}" \
+                                          --docker-password="${DOCKER_PASSWORD}" \
+                                          --docker-email="none" \
+                                          -n default \
+                                          --dry-run=client -o yaml | kubectl apply -f -
+
+                                        # Generate APP_KEY
+                                        APP_KEY="base64:$(openssl rand -base64 32)"
+
+                                        # Clean DB_PORT (remove spaces)
+                                        DB_PORT_CLEAN=$(echo "${DB_PORT}" | tr -d ' ')
+
+                                        # Create secret.yaml
+                                        cat > k8s/secret.yaml << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: paprika-secret
+type: Opaque
+data:
+  DATABASE_CONNECTION: cGdzcWw=
+  DATABASE_HOST: $(echo -n "${DB_HOST}" | base64)
+  DATABASE_PORT_NUMBER: $(echo -n "${DB_PORT_CLEAN}" | base64)
+  DATABASE_NAME: $(echo -n "${DB_DATABASE}" | base64)
+  DATABASE_USERNAME: $(echo -n "${DB_USERNAME}" | base64)
+  DATABASE_PASSWORD: $(echo -n "${DB_PASSWORD}" | base64)
+  APP_KEY: $(echo -n "${APP_KEY}" | base64)
+EOF
+
+                                        # Inspect manifest directory
+                                        ls -la k8s/
+
+                                        echo "Recreating deployment ..."
+                                        echo "=== Effective sensitive env values ==="
+                                        echo "DB_HOST=${DB_HOST}"
+                                        echo "DB_PORT=${DB_PORT_CLEAN}"
+                                        echo "DB_DATABASE=${DB_DATABASE}"
+
+                                        kubectl delete deployment paprika -n default --ignore-not-found
+                                        kubectl apply -f k8s/secret.yaml
+                                        DOCKER_IMAGE=${DOCKER_IMAGE} DOCKER_TAG=${DOCKER_TAG} envsubst '${DOCKER_IMAGE} ${DOCKER_TAG}' < k8s/deployment.yaml | kubectl apply -f -
+                                        kubectl set image deployment/paprika paprika=${DOCKER_IMAGE}:${DOCKER_TAG} -n default
+                                        kubectl rollout status deployment/paprika -n default
+                                    '''
+
+                                    // 檢查部署狀態
+                                    sh 'kubectl get deployments -n default'
+                                    sh 'kubectl rollout status deployment/paprika -n default'
+                                } catch (Exception e) {
+                                    echo "Error during deployment: ${e.message}"
+                                    // Debug non-ready pods and recent events
+                                    sh '''
+                                        set +e
+                                        echo "=== Debug: pods for paprika ==="
+                                        kubectl get pods -n default -l app=paprika -o wide || true
+
+                                        echo "=== Debug: describe non-ready pods ==="
+                                        for p in $(kubectl get pods -n default -l app=paprika -o jsonpath='{.items[?(@.status.conditions[?(@.type=="Ready")].status!="True")].metadata.name}'); do
+                                          echo "--- $p"
+                                          kubectl describe pod -n default "$p" || true
+                                          echo "=== Last 200 logs for $p ==="
+                                          kubectl logs -n default "$p" --tail=200 || true
+                                        done
+
+                                        echo "=== Recent events (default ns) ==="
+                                        kubectl get events -n default --sort-by=.lastTimestamp | tail -n 100 || true
+                                    '''
+                                    throw e
+                                }
+                            } // end script
+                        } // end inner withCredentials
+                    } // end outer withCredentials
+                } // end container
+            } // end steps
+        } // end stage
     }
     post {
         always {
-            cleanWs()
+            script {
+                if (env.WORKSPACE) {
+                    cleanWs()
+                }
+            }
         }
     }
 }
